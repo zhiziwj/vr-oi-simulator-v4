@@ -85,6 +85,7 @@ const ACHIEVEMENTS = {
   teacher_hit: { name: '袭师者',    desc: '殴打了监考老师' },
   explorer:    { name: '厕所旅行家', desc: '完整去过一次洗手间' },
   wanderer:    { name: '红圈五连',  desc: '同一场考试五次随意走动' },
+  lesson_lose: { name: '被 0 分打倒', desc: '网吧里那个人把你推出了门' },
 
   /* ---- 校园段（从校门口走到考场） ---- */
   portal:      { name: '走个捷径',   desc: '第一次使用校门口的传送光圈' },

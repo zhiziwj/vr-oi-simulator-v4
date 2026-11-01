@@ -4903,6 +4903,71 @@ check('400 分表彰大会：进专用礼堂地图，而不是校门口', () => 
   `, sandbox);
   return '400 分 → 礼堂（舞台/观众席）→ 说两句 → 结算 400';
 });
+check('网吧那个人：嘲讽开打、血量 120、臭水只停 1.2 秒', () => {
+  const r = JSON.parse(vm.runInContext(`
+    JSON.stringify((() => {
+      const out = {};
+      state.postExamWorld = true; state.ended = true;
+      state.netbarMode = 'post'; state.lessonDone = false; state.lessonActive = false;
+      state.view = 'world';
+      switchArea('netbar'); state.area = 'netbar';
+      lessonBuild();
+      out.built = lessonBuilt;
+      out.visible = lessonVisible();
+      out.targets = netbarTargets.filter(t => t.kind === 'lesson').length;
+      lessonTalk();
+      const d = dialogs[dialogs.length - 1];
+      out.opts = d ? d.options.length : 0;
+      const label = d && d.options[0] ? String(d.options[0].label) : '';
+      out.label = label;
+      if (d && d.options.length) selectDialogOption(0);
+      out.active = state.lessonActive;
+      out.max = lessonState.max;
+      out.bar = !document.getElementById('bossBar').classList.contains('hidden');
+      /* 臭水：只停 1.2 秒 */
+      state.pos.set(NETBAR.x - 5.25, PLAYER_EYE, NETBAR.z - 2.35);
+      lessonState.stunnedUntil = 0;
+      const hit = lessonStink();
+      out.stinkHits = hit;
+      out.stinkFor = +(lessonState.stunnedUntil - state.worldTime).toFixed(2);
+      /* 打空：120 血，空手 9 点，一共 14 拳 */
+      lessonState.hp = 9;
+      state.yaw = 0; yawTarget = 0;
+      lessonPerson.group.position.set(state.pos.x, 0, state.pos.z - 1.2);
+      out.punchReach = punchReach();
+      out.gap = 1.2;
+      out.inArc = inAttackArc(lessonPerson.group.position.x,
+                              lessonPerson.group.position.z, punchArc());
+      out.dbg = { active: state.lessonActive, ended: state.ended,
+                  frozen: state.frozen, hp: state.hp, view: state.view };
+      lessonPunch();
+      out.hpAfter = lessonState.hp;
+      out.done = state.lessonDone;
+      out.activeAfter = state.lessonActive;
+      return out;
+    })())
+  `, sandbox));
+  vm.runInContext(`
+    dismissDialogs();
+    state.lessonActive = false; state.lessonDone = false;
+    state.ended = false; state.view = 'world'; state.postExamWorld = false;
+    state.netbarMode = '';
+    switchArea('room'); state.area = 'room'; state.bounds = AREA_BOUNDS.room;
+    hideLessonBar();
+  `, sandbox);
+  if (!r.built || !r.visible || r.targets < 1)
+    throw new Error('网吧那个人没建出来/不可见：' + JSON.stringify(r));
+  if (r.opts !== 2) throw new Error('对话不是两个选项：' + r.opts);
+  if (String(r.label).indexOf('两年') < 0)
+    throw new Error('第一个选项不是嘲讽：' + r.label);
+  if (!r.active || r.max !== 120) throw new Error('嘲讽后没开战 / 血量不对：' + r.max);
+  if (!r.bar) throw new Error('开战没显示 boss 血条');
+  if (r.stinkHits !== 1 || !(r.stinkFor > 1.0 && r.stinkFor < 1.4))
+    throw new Error('臭水对那个人的控制时长不对：' + r.stinkFor);
+  if (!r.done || r.activeAfter)
+    throw new Error('打空之后没结束：' + JSON.stringify(r));
+  return '两个选项 · 血量 120 · 臭水 1.2 秒 · 打空收场';
+});
 check('100 分以下：进信息教练办公室（独立建模），不进礼堂', () => {
   const r = JSON.parse(vm.runInContext(`
     JSON.stringify((() => {

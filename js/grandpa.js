@@ -290,8 +290,44 @@ function grandpaPunch(){
   toast('你打中了他。' + (grandpaState.hp > 0
     ? '爷爷的白胡子抖了抖。'
     : '爷爷的法杖脱手了。'), 1500);
+  if (grandpaState.hp > 0){
+    grandpaState.hitCount = (grandpaState.hitCount | 0) + 1;
+    grandpaLine('gp_hit', GRANDPA_HIT_LINES[(grandpaState.hitCount | 0) % GRANDPA_HIT_LINES.length]);
+  }
   if (grandpaState.hp <= 0) grandpaWin();
 }
+
+/* ---- 战斗间台词 ----
+   一句一句地说；同一个 key 有冷却。爷爷说话的地方不多，所以每一句都要
+   像"他不屑于跟你解释"，而不是"怪物在喊台词"。 */
+const GP_LINE_AT = {};
+function grandpaLine(key, line, gap){
+  if (!line) return;
+  const now = state.worldTime;
+  const g = gap === undefined ? 3.2 : gap;
+  if (GP_LINE_AT[key] !== undefined && now - GP_LINE_AT[key] < g) return;
+  GP_LINE_AT[key] = now;
+  toast(line, 2400);
+}
+
+const GRANDPA_HIT_LINES = [
+  '爷爷：「有点意思。」',
+  '爷爷：「这一拳，比你老师强。」',
+  '爷爷：「几十年了，头一个敢还手的。」'
+];
+const GRANDPA_NOVA_LINES = [
+  '爷爷：「离我远点。」',
+  '爷爷：「这一步，你踩进来做什么。」'
+];
+const GRANDPA_HEAVY_LINES = [
+  '爷爷：「矩阵不收人，只收分。」',
+  '爷爷：「你的答案呢？」'
+];
+const GRANDPA_TELE_LINES = [
+  '爷爷：「你站的地方，我年轻时候站过。」',
+  '爷爷：「这屋子还是老样子。」'
+];
+
 
 /* ---------------------------- 输赢 ---------------------------- */
 function grandpaWin(){
@@ -461,6 +497,7 @@ function grandpaNovaHit(){
       setTimeout(() => { redFlash.style.opacity = '0'; }, 220);
     }
     toast('爷爷一跺脚 —— 近身矩阵炸开，2 点伤害！', 2200);
+    grandpaLine('gp_nova', GRANDPA_NOVA_LINES[(grandpaState.hitCount | 0) % GRANDPA_NOVA_LINES.length], 2.6);
   } else {
     toast('爷爷的矩阵冲击波擦着你炸开。', 1500);
   }
@@ -739,6 +776,8 @@ function updateGrandpa(worldDt, t){
       gpImpactSpark(tx, 1.15, tz, 0xb48cff);
       audio.beep(520, 0.12, 0.05, 'triangle');
       toast('爷爷脚下的矩阵闪了一下 —— 他到了你面前。', 1800);
+      grandpaLine('gp_tele', GRANDPA_TELE_LINES[(gs.teleCount | 0) % GRANDPA_TELE_LINES.length], 4.0);
+      gs.teleCount = (gs.teleCount | 0) + 1;
     }
   }
 
@@ -785,7 +824,8 @@ function updateGrandpa(worldDt, t){
       gs.windDmg = heavy ? 2 : 1;
       gs.windUntil = state.worldTime + (heavy ? 0.70 : 0.52);
       gs.nextAt = state.worldTime + (heavy ? 1.35 : 0.95);
-      if (heavy) toast('爷爷横起法杖 —— 追踪矩阵弹！', 1500);
+      if (gs.windKind === 'heavy') toast('爷爷横起法杖 —— 追踪矩阵弹！', 1500);
+      if (heavy) grandpaLine('gp_heavy', GRANDPA_HEAVY_LINES[(gs.swingCount | 0) % GRANDPA_HEAVY_LINES.length], 3.0);
       audio.beep(heavy ? 120 : 420, heavy ? 0.20 : 0.10, 0.05, 'triangle');
     }
     return;

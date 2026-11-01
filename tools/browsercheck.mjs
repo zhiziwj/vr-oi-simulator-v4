@@ -2538,6 +2538,46 @@ try {
   problems.push('移动端探针异常：' + (e && e.message || e));
 }
 
+/* ---------------- 12.7 网吧那个人：开打之后真的会动、会打 ---------------- */
+console.log('\n== 12.7 网吧那个人（真 3D） ==');
+const lessonProbe = JSON.parse(await evaluate(`JSON.stringify((() => {
+  state.lessonActive = false; state.lessonDone = false;
+  state.postExamWorld = true; state.view = 'world'; state.ended = true;
+  switchArea('netbar'); state.area = 'netbar';
+  state.netbarMode = 'post';
+  lessonBuild();
+  state.pos.set(NETBAR.x - 2.0, PLAYER_EYE, NETBAR.z - 2.4);
+  state.hp = 5; state.hpMax = 5; state.hpVisible = true; renderHp();
+  lessonTalk();
+  const d = dialogs[dialogs.length - 1];
+  const opts = d ? d.options.length : 0;
+  if (d) selectDialogOption(0);
+  const p0 = { x: lessonPerson.group.position.x, z: lessonPerson.group.position.z };
+  const hp0 = state.hp;
+  /* 跑 3 秒：他应该贴上来并至少打出一拳 */
+  const wt0 = state.worldTime;
+  for (let i = 0; i < 180; i++){ state.worldTime = wt0 + i * 0.016; updateLesson(0.016, i * 0.016); }
+  const p1 = { x: lessonPerson.group.position.x, z: lessonPerson.group.position.z };
+  return {
+    opts: opts, active: state.lessonActive,
+    moved: +Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(2),
+    gap: +Math.hypot(state.pos.x - p1.x, state.pos.z - p1.z).toFixed(2),
+    swings: lessonState.swingCount | 0,
+    hp: state.hp, hp0: hp0
+  };
+})())`));
+console.log('  那个人: ' + JSON.stringify(lessonProbe));
+if (lessonProbe.opts !== 2 || !lessonProbe.active)
+  problems.push('网吧那个人没进战斗：' + JSON.stringify(lessonProbe));
+if (!(lessonProbe.moved > 0.3))
+  problems.push('网吧那个人不会走过来（位移 ' + lessonProbe.moved + '）');
+if ((lessonProbe.swings | 0) < 1)
+  problems.push('网吧那个人不会出手（swingCount=' + lessonProbe.swings + '）');
+if (!(lessonProbe.hp < lessonProbe.hp0))
+  problems.push('网吧那个人的拳打不掉血：' + lessonProbe.hp0 + ' → ' + lessonProbe.hp);
+await evaluate(`lessonState.over = true; state.lessonActive = false;
+  state.lessonDone = false; hideLessonBar(); dismissDialogs();`);
+
 if (problems.length){
   problems.forEach(p => console.log('  ✗ ' + p));
   realErrors.forEach(e => console.log('    ' + e));

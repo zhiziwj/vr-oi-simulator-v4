@@ -236,7 +236,10 @@ function throwStinkWater(){
   if (state.grandpaActive && typeof grandpaStink === 'function'){
     grandpaHits = grandpaStink(to, STINK_RADIUS) ? 1 : 0;
   }
-  const total = victims.length + brawlHits + grandpaHits;
+  /* 网吧里那个人：有效，但只停 1.2 秒（lesson.js 后加载） */
+  let lessonHits = 0;
+  if (typeof lessonStink === 'function') lessonHits = lessonStink(to, STINK_RADIUS) ? 1 : 0;
+  const total = victims.length + brawlHits + grandpaHits + lessonHits;
 
   if (total > 1){
     toast('一瓶臭水泼了 ' + total + ' 个人一脸。', 1900);

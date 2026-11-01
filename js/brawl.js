@@ -28,6 +28,56 @@ const BRAWL_SWEEP_DMG = 3;
 const BRAWL_SWEEP_KNOCK = 6.0;
 const BRAWL_BOSS_SEP = 0.95;           /* 两个 boss 的最小间距 */
 
+/* ---- 战斗间台词 ----
+   一句一句地说，同一个 key 有冷却；不叠屏、不刷屏。
+   玩家能感知到的"boss 活着"，一半来自这些句子。 */
+const BROLL_LINE_AT = {};
+function brawlLine(key, line, gap){
+  if (!line) return;
+  const now = state.worldTime;
+  const g = gap === undefined ? 3.4 : gap;
+  if (BROLL_LINE_AT[key] !== undefined && now - BROLL_LINE_AT[key] < g) return;
+  BROLL_LINE_AT[key] = now;
+  toast(line, 2300);
+}
+
+const VOLLY_HIT = [
+  '小林：「打他！别让他喘！」',
+  '阿舟：「同学，你冷静一点行不行。」',
+  '小林：「我志愿是来帮忙的，不是来挨打的！」'
+];
+const VOLLY_LOW = [
+  '阿舟：「小林撑不住了！」',
+  '小林：「没事……我还能站。」'
+];
+const VOLLY_STINK = [
+  '小林：「什么味儿……呕 ——」',
+  '阿舟：「你他妈从哪儿掏出来的！」'
+];
+const ZHAO_START = [
+  '老赵把搪瓷杯往台阶上一放：「行，我活动活动。」'
+];
+const ZHAO_HIT = [
+  '老赵：「小子，拳头不错。就是太急。」',
+  '老赵：「这一下，跟谁学的？」',
+  '老赵：「我在这门口站了三十年，这种人见多了。」'
+];
+const ZHAO_SWEEP = [
+  '老赵：「蹲下！」',
+  '老赵：「还有这一下。」'
+];
+const ZHAO_BACKSTAB = [
+  '老赵：「背后有人。」',
+  '老赵：「说过你太急了。」'
+];
+const ZHAO_LOW = [
+  '老赵：「行啊……我认真了。」'
+];
+const ZHAO_LOSE = [
+  '老赵：「坐着……坐下说。」'
+];
+
+
 /* boss 血条 DOM */
 const brawlBarEl = $('bossBar');
 const brawlBarName = $('bbName');
@@ -217,6 +267,14 @@ function brawlPunch(){
   brawlState.hp = Math.max(0, brawlState.hp - dmg);
   brawlSetBar(true);
   audio.punch();
+
+  /* 战斗间台词：谁挨了打谁说话 */
+  const firstTarget = targets[0];
+  if (firstTarget && firstTarget.name === '门卫 · 老赵'){
+    brawlLine('zhao_hit', ZHAO_HIT[(firstTarget.swingCount | 0) % ZHAO_HIT.length]);
+  } else if (firstTarget){
+    brawlLine('volly_hit', VOLLY_HIT[(firstTarget.swingCount | 0) % VOLLY_HIT.length]);
+  }
   kickView(0.06, (Math.random() - 0.5) * 0.06);
   hitStop = 0.09;
   const now = state.worldTime;
@@ -454,6 +512,7 @@ function brawlTeleportBackstab(b){
     setTimeout(() => { redFlash.style.opacity = '0'; }, 180);
   }
   toast('老赵突然出现在你背后 —— 一肘砸下来！', 2400);
+  brawlLine('zhao_backstab', ZHAO_BACKSTAB[Math.random() < 0.5 ? 0 : 1]);
   brawlHurtPlayer(2, b, 'backstab');
 }
 
@@ -532,6 +591,9 @@ function brawlUpdateBoss(b, dt, now, t){
     brawlTeleportBackstab(b);
     return;
   }
+  if (b.ring){
+    b.ring.position.set(b.group.position.x, 0.03, b.group.position.z);
+  }
 
   if (b.hitFlash > 0){
     b.hitFlash -= dt;
@@ -555,6 +617,7 @@ function brawlUpdateBoss(b, dt, now, t){
                brawlState.hp <= brawlState.max * 0.5;
   if (rage && !b.rageAnnounced){
     b.rageAnnounced = true;
+    brawlLine('zhao_low', ZHAO_LOW[0], 1);
     toast('老赵把搪瓷杯放在台阶上 —— 他认真了。', 2800);
     audio.beep(160, 0.25, 0.06, 'sawtooth');
   }
@@ -623,6 +686,7 @@ function brawlUpdateBoss(b, dt, now, t){
     audio.beep(sweep ? 220 : 360, sweep ? 0.18 : 0.10, 0.05, 'sawtooth');
     if (sweep){
       brawlBeginSweep(b);
+      brawlLine('zhao_sweep', ZHAO_SWEEP[0]);
       toast('老赵沉下肩膀，脚下出现一圈红弧 —— 3 秒后扫堂腿，快出圈！', 3000);
     }
   }
@@ -684,8 +748,10 @@ function brawlHurtPlayer(dmg, boss, kind){
 
   if (kind === 'sweep'){
     toast('老赵一记扫堂腿 —— 你被踢得后退了两步。', 2000);
+    brawlLine('zhao_hurt_sweep', '老赵：「说了让你出圈。」', 2.2);
   } else if (kind === 'backstab'){
     toast('老赵从背后一肘砸在你肩上 —— 掉了 2 格血。', 2200);
+    brawlLine('zhao_hurt_back', '老赵：「别老往我背后贴。」', 2.2);
   } else {
     toast((boss ? boss.name : '对面') + '一拳打在你身上。', 1600);
   }
@@ -747,6 +813,7 @@ function brawlPhaseCleared(){
     audio.beep(200, 0.30, 0.06, 'sawtooth');
     setTimeout(() => audio.beep(150, 0.40, 0.06, 'sawtooth'), 200);
     toast('志愿者二人组倒了。老赵把搪瓷杯放在台阶上：「行，我活动活动。」', 3800);
+    brawlLine('zhao_start', ZHAO_START[0], 1);
     return;
   }
 
@@ -858,6 +925,10 @@ function brawlStink(center, r){
         toast('老赵：「这味儿，还不如我值班室那桶拖把水。」', 2400);
       }
       continue;
+    }
+    if (state.worldTime - (b.lastStinkLineAt || -999) > 2.6){
+      b.lastStinkLineAt = state.worldTime;
+      brawlLine('volly_stink', VOLLY_STINK[Math.random() < 0.5 ? 0 : 1], 1);
     }
     b.stunnedUntil = state.worldTime + STINK_STUN;
     b.windUntil = 0;                 /* 抬手到一半被熏，这一下就没了 */

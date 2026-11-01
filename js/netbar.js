@@ -191,6 +191,11 @@ function enterNetbarPost(){
   state.view = 'world';
   switchArea('netbar');
   netbarSpawnAt(NETBAR.x - 2.6, NETBAR.z + 2.2, 0.33);
+  /* 最里面那排机位旁边站着一个人（lesson.js）：只在考后出现 */
+  if (typeof lessonBuild === 'function'){
+    lessonBuild();
+    if (typeof lessonShow === 'function') lessonShow(lessonVisible());
+  }
   state.pauseGraceUntil = performance.now() + 1400;
   requestLock();
   toast('3 号机还开着。点击画面锁定鼠标，走到机位前按 E；电脑里能开 dino 或洛谷。', 3400);
@@ -224,7 +229,16 @@ function netbarInteract(){
   const rec = netbarTargets.find(t => t.obj === hits[0].object);
   if (!rec) return false;
 
-  if (rec.kind === 'dino'){
+  if (rec.kind === 'lesson'){
+    /* 战斗已开：左键就是出拳，不再弹对话 */
+    if (state.lessonActive){
+      actionSpace = { fn: lessonPunch };
+      setPrompt('[ 左键 ] 出拳');
+    } else {
+      actionE = { fn: lessonTalk };
+      setPrompt('[ E ] 说句话');
+    }
+  } else if (rec.kind === 'dino'){
     actionE = { fn: netbarPCMenu };
     setPrompt('[ E ] 打开 3 号机（dino.exe / 洛谷）');
   } else if (rec.kind === 'exit'){
@@ -319,5 +333,13 @@ function updateNetbarArea(worldDt, t){
   if (netbarDinoGlow){
     netbarDinoGlow.material.color.setHex(
       (t % 2.4) < 1.9 ? 0x7dff9a : 0x2f7a45);
+  }
+  /* 网吧里那个人：只有考后才在；战斗时推他的 AI（lesson.js 后加载）。
+     用函数自身兜住"脚本还没加载完"的情况，别直接读 lesson.js 的 let ——
+     那会在加载期踩到暂时性死区。 */
+  if (typeof lessonVisible === 'function' && typeof lessonShow === 'function' &&
+      typeof lessonGroup !== 'undefined' && lessonGroup){
+    lessonShow(lessonVisible());
+    if (typeof updateLesson === 'function') updateLesson(worldDt, t);
   }
 }

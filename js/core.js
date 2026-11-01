@@ -206,9 +206,10 @@ const state = {
   netbarMode: '',                      /* pre | post */
   pauseGraceUntil: 0,
   touchMode: false,                    /* 触屏：不锁指针，改用摇杆 + 屏幕拖动 */                  /* 进/出网吧时指针锁切换，别自动弹暂停 */
-  grandpaActive: false,
-  grandpaWon: false,
+  grandpaActive: false,  grandpaWon: false,
   grandpaDestroyed: false,
+  /* 网吧里那个连第一题都没 AC 的人：考后一段单独的剧情战斗（lesson.js） */
+  lessonActive: false, lessonDone: false, lessonHearts: false,
   /* 网吧 3 号机上的洛谷：本地题单 + 草稿，不参与本场分数 */
   luoguSolved: {},
   luoguCode: {},
