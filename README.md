@@ -89,7 +89,7 @@ node tools/browsercheck.mjs  # 真实 headless Chrome + WebGL（需先起服务�
 
 ## 说明
 
-- 参考原作：<https://aakaakii.github.io/vr-oi-simulator/>。本项目是按同一套玩法重新实现，代码、场景、物理和判题均为独立实现。
+- 参考原作：<https://aakaakii.github.io/vr-oi-simulator/>。感谢！
 - 小恐龙是对 Chromium 断网小恐龙的 canvas 复刻；three.js 使用 r128。
 - 游戏内所有校名、人物、成绩和事件均为虚构，仅供娱乐。
 
