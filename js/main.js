@@ -421,6 +421,15 @@ function animate(){
   const worldDt = worldDtFor(realDt);
   state.worldTime += worldDt;
 
+  /* 准星可见性：让它跟着"现在能不能在世界里动"走，而不是靠每个入口
+     各自记得 remove('hidden')。考后进网吧/礼堂/派出所/教练办公室时
+     没人打开过它，玩家就抱怨"准心都没了"。这里每帧对一次，幂等。 */
+  const wantCrosshair = state.started && state.view === 'world' &&
+                        (!state.ended || state.postExamWorld) && !state.frozen;
+  if (wantCrosshair === crosshair.classList.contains('hidden')){
+    crosshair.classList.toggle('hidden', !wantCrosshair);
+  }
+
   const inWorld = state.view === 'world';
 
   if (inWorld && state.started && (!state.ended || state.postExamWorld) && !state.frozen){

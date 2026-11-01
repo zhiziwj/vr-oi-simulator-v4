@@ -104,10 +104,12 @@ function peRender(opts){
     });
   }
 
-  state.view = 'postexam';
-  releaseLock();
+  /* 先把 UI 收起来，再切视图：showEnding 那边的"世界视图 = 有准星"
+     规则（main.js 每帧对一次）才不会看到旧的 crosshair 状态。 */
   crosshair.classList.add('hidden');
   promptEl.classList.add('hidden');
+  state.view = 'postexam';
+  releaseLock();
 }
 
 /* 最终结算：把场景结果、成绩、榜、dino 一起交给 ending.js */

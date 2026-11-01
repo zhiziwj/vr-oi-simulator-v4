@@ -619,6 +619,12 @@ function updateGrandpa(worldDt, t){
   /* 赢：爷爷消散，矩阵收缩，然后自动交卷 */
   if (grandpaState.cine === 'win'){
     grandpaState.cineT += worldDt;
+    /* 开场那会儿准星是藏着的（召唤演出）；这里每帧对一次，配合 main.js
+       那套"世界视图 = 有准星"的规则，不会留在无准星的状态里。 */
+    if (state.view === 'world' && !state.frozen &&
+        crosshair.classList.contains('hidden')){
+      crosshair.classList.remove('hidden');
+    }
     if (g){
       const k = Math.max(0, 1 - grandpaState.cineT / 1.8);
       g.scale.set(1.22 * k, 1.28 * k, 1.22 * k);

@@ -1862,6 +1862,11 @@ const mapsProbe = await evaluate(`(() => {
     const hd = dialogs[dialogs.length - 1];
     out.hall.dialog = hd ? String(hd.title || '') : '';
     out.hall.opts = hd ? hd.options.length : 0;
+    /* 准星：考后场景里也必须有（以前没人把它打开，玩家只能盲走）。
+       测试里 rAF 不跑，所以手动推一帧 animate() 让那条每帧规则生效。 */
+    animate();
+    out.hall.crosshair = !document.getElementById('crosshair')
+      .classList.contains('hidden');
     if (hd && hd.options.length) selectDialogOption(0);
     if (peActions.children.length)
       peActions.children[peActions.children.length - 1].click();
@@ -2455,6 +2460,8 @@ if (!mapsProbe.hall.canLock)
   problems.push('礼堂里 canLockView() 还是 false（鼠标锁不上）');
 if (mapsProbe.hall.floor !== 0.56 || !mapsProbe.hall.podium)
   problems.push('礼堂舞台/讲台碰撞不对：' + JSON.stringify(mapsProbe.hall));
+if (!mapsProbe.hall.crosshair)
+  problems.push('考后礼堂没有准星（玩家会盲走）');
 if (String(mapsProbe.hall.dialog).indexOf('表 彰 大 会') < 0 ||
     mapsProbe.hall.opts < 3)
   problems.push('礼堂任务不对：' + JSON.stringify(mapsProbe.hall));
