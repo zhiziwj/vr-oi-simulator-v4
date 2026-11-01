@@ -3190,6 +3190,45 @@ check('爷爷近身：范围冲击波直接 2 点伤害', () => {
   if (r.novas < 1) throw new Error('没有生成冲击波环');
   return '近身 → nova 前摇 → 3→1 血（2 点范围）';
 });
+check('爷爷吸血：打掉你 1 格血，他回 12 点', () => {
+  const r = JSON.parse(vm.runInContext(`
+    JSON.stringify((() => {
+      state.ended = false; state.frozen = false; state.view = 'world';
+      state.area = 'room'; state.bounds = AREA_BOUNDS.room;
+      state.teacherDown = false; state.guardKills = 0;
+      state.started = true; state.hp = 5; state.hpMax = 5; state.hpVisible = true;
+      state.eggShield = 0;
+      grandpaStart();
+      grandpaState.cine = 'fight'; state.frozen = false;
+      grandpaState.hp = 100;
+      grandpaState.lastHurtAt = -999;
+      grandpaHurt(1);
+      const first = { hp: state.hp, boss: grandpaState.hp };
+      grandpaState.lastHurtAt = -999;
+      grandpaHurt(2);
+      const second = { hp: state.hp, boss: grandpaState.hp };
+      return { first: first, second: second, max: grandpaState.max };
+    })())
+  `, sandbox));
+  vm.runInContext(`
+    try { if (grandpaState.group) scene.remove(grandpaState.group); } catch(e){}
+    try { if (grandpaState.matrix) scene.remove(grandpaState.matrix.group); } catch(e){}
+    try { if (grandpaState.ring) scene.remove(grandpaState.ring); } catch(e){}
+    clearGrandpaProjectiles(); clearGrandpaNovas();
+    grandpaState.active = false; grandpaState.cine = '';
+    state.grandpaActive = false; state.grandpaWon = false;
+    state.frozen = false; state.ended = false; state.view = 'world';
+    state.area = 'room'; state.bounds = AREA_BOUNDS.room;
+    if (!teacher){ teacher = buildTeacher(2.4, 0); teacher.userData = { mode: 'patrol' }; }
+    state.hp = 3; state.hpMax = 3; state.hpVisible = false;
+    gpHideBar();
+  `, sandbox);
+  if (r.first.hp !== 4 || r.first.boss !== 112)
+    throw new Error('打 1 格吸血不对：' + JSON.stringify(r.first));
+  if (r.second.hp !== 2 || r.second.boss !== 136)
+    throw new Error('打 2 格吸血不对：' + JSON.stringify(r.second));
+  return '1 格 → 5→4 血 / 爷爷 100→112；2 格 → 4→2 / 112→136';
+});
 check('打败老赵的爷爷 → 四题全 AC → 自动进考后流程', () => {
   const r = JSON.parse(vm.runInContext(`JSON.stringify((() => {
     state.ended = false; state.frozen = false; state.view = 'world';

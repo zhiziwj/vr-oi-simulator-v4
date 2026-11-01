@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>VR OI 考场 · 重制版</title>
 <!-- 内联 SVG 图标：省掉一次请求，也避免浏览器自动索取 /favicon.ico 造成 404 噪音
      （那会在控制台留下一条红字，排查真问题时很碍眼） -->
@@ -27,6 +27,23 @@
   <div id="hudProbs"></div>
   <button id="btnSettings">设置</button>
   <button id="btnEnd">交卷离场</button>
+</div>
+
+<!-- ===================== 移动端触控 =====================
+     左摇杆移动，右侧拖动转视角；按钮走与键盘/鼠标相同的入口。
+     桌面端由 .touch-mode 控制，不显示。 -->
+<div id="touchUI" class="touchUI hidden" aria-hidden="true">
+  <div id="touchStick" aria-label="移动摇杆"><div id="touchKnob"></div></div>
+  <div id="touchHint">拖动屏幕转视角</div>
+  <div id="touchActions">
+    <button class="touchbtn" id="touchQ" type="button">道具</button>
+    <button class="touchbtn" id="touchBag" type="button">背包</button>
+    <button class="touchbtn" id="touchPhone" type="button">手机</button>
+    <button class="touchbtn" id="touchF" type="button">干扰</button>
+    <button class="touchbtn" id="touchJump" type="button">跳</button>
+    <button class="touchbtn" id="touchPause" type="button">Ⅱ</button>
+    <button class="touchbtn big" id="touchAttack" type="button">攻击 / 交互</button>
+  </div>
 </div>
 <div id="minimapWrap" class="hidden">
   <canvas id="minimap" width="148" height="132"></canvas>
@@ -489,5 +506,6 @@
      它在 ending.js 之后（要调 showEnding），在 main.js 之前。 -->
 <script src="js/postexam.js?v=3"></script>
 <script src="js/main.js?v=3"></script>
+<script src="js/mobile.js?v=3"></script>
 </body>
 </html>

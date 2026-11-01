@@ -16,6 +16,7 @@
 const GRANDPA_HP = 240;
 const GRANDPA_HURT_COOLDOWN = 0.95;
 const GRANDPA_RANGE = 14;
+const GRANDPA_LIFESTEAL = 12;          /* 每打掉玩家 1 格血，爷爷回 12 点 */
 
 const grandpaState = {
   active: false,
@@ -222,13 +223,27 @@ function grandpaHurt(dmg){
   state.hp -= dmg;
   if (state.hp < 0) state.hp = 0;
   renderHp();
+
+  /* 吸血：爷爷从你掉的每一格血里回 12 点，最多回满 */
+  const heal = Math.min(grandpaState.max - grandpaState.hp,
+                        dmg * GRANDPA_LIFESTEAL);
+  if (heal > 0){
+    grandpaState.hp += heal;
+    gpFillBar();
+    if (grandpaState.group){
+      gpImpactSpark(grandpaState.group.position.x, 1.35,
+                    grandpaState.group.position.z, 0x7dff9a);
+    }
+  }
   if (redFlash){
     redFlash.style.opacity = '0.5';
     setTimeout(() => { redFlash.style.opacity = '0'; }, 200);
   }
   audio.beep(140, 0.25, 0.07, 'sawtooth');
   kickView(0.09, (Math.random() - 0.5) * 0.08);
-  toast('爷爷的法杖敲在地上，整间教室都在抖。', 1700);
+  toast(heal > 0
+    ? ('爷爷吸走你 ' + dmg + ' 格血，回复了 ' + heal + ' 点。')
+    : '爷爷的法杖敲在地上，整间教室都在抖。', 1800);
 
   /* 被打退 */
   if (grandpaState.group){

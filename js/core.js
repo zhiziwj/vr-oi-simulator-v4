@@ -204,7 +204,8 @@ const state = {
   postExamStage: '',                   /* netbar | school */
   postExamTier: '',
   netbarMode: '',                      /* pre | post */
-  pauseGraceUntil: 0,                  /* 进/出网吧时指针锁切换，别自动弹暂停 */
+  pauseGraceUntil: 0,
+  touchMode: false,                    /* 触屏：不锁指针，改用摇杆 + 屏幕拖动 */                  /* 进/出网吧时指针锁切换，别自动弹暂停 */
   grandpaActive: false,
   grandpaWon: false,
   grandpaDestroyed: false,

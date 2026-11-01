@@ -59,6 +59,7 @@ let pointerLocked = false, lastLockAt = 0;
 
 function lockElement(){ return renderer ? renderer.domElement : document.body; }
 function canLockView(){
+  if (state.touchMode) return false;   /* 触屏用右侧拖动转视角，不申请指针锁定 */
   return LOOK_VIEWS.has(state.view) && state.started &&
          (!state.ended || state.postExamWorld);
 }

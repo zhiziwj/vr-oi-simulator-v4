@@ -2480,6 +2480,64 @@ if (mapsProbe.coach.score !== '48' ||
     String(mapsProbe.coach.end).indexOf('办公室') < 0)
   problems.push('教练办公室结算不对：' + JSON.stringify(mapsProbe.coach));
 
+/* ---------------- 13. 移动端：触控层 / 摇杆 / DOM 弹窗 ---------------- */
+console.log('\n== 13. 移动端（390×844 触屏模拟） ==');
+try {
+  await call('Emulation.setDeviceMetricsOverride', {
+    width: 390, height: 844, deviceScaleFactor: 2, mobile: true
+  });
+  await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await call('Page.navigate', { url: URL_.split('?')[0] + '?touch=1' });
+  await sleep(2600);
+  await evaluate(`document.getElementById('btnStart').click()`);
+  await sleep(500);
+  const mob = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const ui = document.getElementById('touchUI');
+    const stick = document.getElementById('touchStick');
+    const r = stick.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const ev = (type, x, y) => stick.dispatchEvent(new PointerEvent(type, {
+      clientX: x, clientY: y, pointerId: 7, bubbles: true, cancelable: true
+    }));
+    ev('pointerdown', cx, cy);
+    ev('pointermove', cx, cy - 34);
+    const keys = { w: !!state.keys.w, a: !!state.keys.a, s: !!state.keys.s, d: !!state.keys.d };
+    ev('pointerup', cx, cy - 34);
+    openDialog({ title: '触屏测试', text: '手指应该点得到这里。',
+      options: [{ label: '选项 A', cb: d => closeDialog(d) },
+                { label: '选项 B', cb: d => closeDialog(d) }] });
+    return {
+      touch: !!state.touchMode, body: document.body.classList.contains('touch-mode'),
+      canLock: canLockView(), ui: !ui.classList.contains('hidden'),
+      keys: keys, stick: !!stick,
+      dialog: (() => {
+        const d = document.getElementById('touchDialog');
+        return { visible: d && !d.classList.contains('hidden'),
+                 buttons: d ? d.querySelectorAll('button').length : 0 };
+      })()
+    };
+  })())`));
+  await sleep(350);
+  const mobDialog = await evaluate(`JSON.stringify((() => {
+    const d = document.getElementById('touchDialog');
+    const ok = { visible: d && !d.classList.contains('hidden'),
+                 buttons: d ? d.querySelectorAll('button').length : 0 };
+    if (d && d.querySelector('button')) d.querySelector('button')
+      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 9 }));
+    return ok;
+  })())`);
+  console.log('  移动端: ' + JSON.stringify(mob));
+  console.log('  触屏弹窗: ' + mobDialog);
+  const md = JSON.parse(mobDialog);
+  if (!mob.touch || !mob.body || mob.canLock !== false || !mob.ui || !mob.stick)
+    problems.push('移动端触控层/摇杆没有启用：' + mob);
+  if (!mob.keys.w) problems.push('摇杆向上没有推动 W：' + JSON.stringify(mob.keys));
+  if (!md.visible || md.buttons < 2)
+    problems.push('触屏弹窗按钮不足：' + JSON.stringify(md));
+} catch(e){
+  problems.push('移动端探针异常：' + (e && e.message || e));
+}
+
 if (problems.length){
   problems.forEach(p => console.log('  ✗ ' + p));
   realErrors.forEach(e => console.log('    ' + e));
