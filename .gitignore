@@ -1,0 +1,11 @@
+# 本地自签证书（tools/gencert.mjs 生成，每台机器各不相同，不入库）
+certs/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+*.log
+
+# 测试工具的临时产物
+node_modules/
+*.tmp
