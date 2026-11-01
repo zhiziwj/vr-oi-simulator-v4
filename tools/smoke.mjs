@@ -4918,6 +4918,10 @@ check('网吧那个人：嘲讽开打、血量 120、臭水只停 1.2 秒', () =
       lessonTalk();
       const d = dialogs[dialogs.length - 1];
       out.opts = d ? d.options.length : 0;
+      out.title = d ? String(d.title || '') : '';
+      /* 站位必须是空地：他原来的位置紧挨 1 号机的桌椅碰撞盒，
+         AI 逐轴滑动时两轴都撞，人就卡在原地不动。 */
+      out.freeSpot = !collides(NETBAR.x - 5.6, NETBAR.z + 1.9, 0.34);
       const label = d && d.options[0] ? String(d.options[0].label) : '';
       out.label = label;
       if (d && d.options.length) selectDialogOption(0);
@@ -4925,7 +4929,7 @@ check('网吧那个人：嘲讽开打、血量 120、臭水只停 1.2 秒', () =
       out.max = lessonState.max;
       out.bar = !document.getElementById('bossBar').classList.contains('hidden');
       /* 臭水：只停 1.2 秒 */
-      state.pos.set(NETBAR.x - 5.25, PLAYER_EYE, NETBAR.z - 2.35);
+      state.pos.set(NETBAR.x - 5.6, PLAYER_EYE, NETBAR.z + 1.9);
       lessonState.stunnedUntil = 0;
       const hit = lessonStink();
       out.stinkHits = hit;
@@ -4960,6 +4964,10 @@ check('网吧那个人：嘲讽开打、血量 120、臭水只停 1.2 秒', () =
   if (r.opts !== 2) throw new Error('对话不是两个选项：' + r.opts);
   if (String(r.label).indexOf('两年') < 0)
     throw new Error('第一个选项不是嘲讽：' + r.label);
+  if (String(r.title).indexOf('小 明') < 0)
+    throw new Error('名字不是小明：' + r.title);
+  if (!r.freeSpot)
+    throw new Error('小明站的位置撞着网吧的桌椅，AI 会卡住');
   if (!r.active || r.max !== 120) throw new Error('嘲讽后没开战 / 血量不对：' + r.max);
   if (!r.bar) throw new Error('开战没显示 boss 血条');
   if (r.stinkHits !== 1 || !(r.stinkFor > 1.0 && r.stinkFor < 1.4))

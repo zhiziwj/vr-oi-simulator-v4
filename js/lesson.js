@@ -38,8 +38,10 @@ const lessonState = {
 };
 
 /* ---------------------------- 建模 ----------------------------
-   站位在最里面那排机位的过道旁（bx-5.3, bz-2.4），背对墙、面朝过道。
-   桌上的可乐、红着的评测屏、椅子上的校服外套 —— 都不用解释。 */
+   站位：**门口左侧那片空地**（bx-5.6, bz+1.9）。
+   之前放在最里排机位旁边（bx-5.25, bz-2.35）—— 那里紧挨着 1 号机的
+   桌椅碰撞盒（中心 bx-4.4, bz-2.8，半宽 0.65 / 半深 0.45），AI 逐轴滑动
+   往玩家方向走时两个轴都撞，人就"卡在原地不动"。门口这片没有任何碰撞。 */
 function lessonBuild(){
   if (lessonBuilt) return;
   lessonBuilt = true;
@@ -53,25 +55,24 @@ function lessonBuild(){
   scene.add(G);
   lessonGroup = G;
 
-  const px = bx - 5.25, pz = bz - 2.35;
+  const px = bx - 5.6, pz = bz + 1.9;
   const p = buildPerson(px, pz, 0x30384a, Math.PI / 2, 'stand');
   /* 眼镜和立起来的衣领：让它看起来像个熬夜的人，不是一个杂兵 */
   box(0.20, 0.05, 0.02, 0x101318, 0.0, 1.42, 0.15, p.group);
   box(0.24, 0.04, 0.16, 0x4a5570, 0.0, 1.16, 0.03, p.group);
-  p.group.rotation.y = -Math.PI / 2;
+  p.group.rotation.y = Math.PI / 2;
   G.add(p.group);
   lessonPerson = p;
 
-  /* 桌上：一罐没开的可乐 + 亮着红的评测屏 */
-  box(0.09, 0.16, 0.09, 0xc0392b, bx - 4.9, 0.85, bz - 2.05, G);
+  /* 他脚边那罐没开的可乐（空的，一直没开） */
+  box(0.09, 0.16, 0.09, 0xc0392b, px + 0.45, 0.08, pz + 0.2, G);
+
+  /* 3 号的那块屏：远处那台机子亮着红，评测记录停在第一题 */
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.36),
     new THREE.MeshBasicMaterial({ color: 0x3a0d10 }));
   scr.position.set(bx - 4.4, 1.28, bz - 2.95);
   G.add(scr);
   lessonScr = scr;
-
-  /* 椅子上挂着的校服外套 */
-  box(0.42, 0.5, 0.06, 0x2b3a5c, bx - 4.4, 0.72, bz - 1.95, G);
 
   const hit = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.9, 1.0),
     new THREE.MeshBasicMaterial({ visible: false }));
@@ -81,7 +82,7 @@ function lessonBuild(){
   lessonHit = hit;
   /* 交互盒不进 netbarTargets 的常驻列表：它跟 lessonGroup 一起开/关，
      否则考前的网吧里会有一个"看不见但点得到"的人。 */
-  netbarTargets.push({ obj: hit, kind: 'lesson', label: '那个人' });
+  netbarTargets.push({ obj: hit, kind: 'lesson', label: '小明' });
 
   /* 脚下的圈：进战斗才出现 */
   lessonState.ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.68, 32),
@@ -111,15 +112,15 @@ function lessonShow(on){
 function lessonTalk(){
   if (state.lessonDone){
     openDialog({
-      title: '那 个 人',
-      text: '椅子上只剩一件校服外套和那罐没开的可乐。\n屏幕还亮着，评测记录停在第一题。',
+      title: '小 明',
+      text: '门口只剩下那罐没开的可乐，还在他刚才站的地方。\n远处 3 号的屏幕亮着，评测记录停在第一题。',
       options: [{ label: '……', cb: d => closeDialog(d) }]
     });
     return;
   }
   if (state.lessonActive) return;
   openDialog({
-    title: '那 个 人',
+    title: '小 明',
     text: '他转过头，愣了一下才认出你。\n' +
           '「……你考完了？」\n' +
           '「我 AC 了零道。第一题。第一题啊。」\n' +
@@ -165,9 +166,9 @@ function lessonStart(){
   /* 站位复位：上一场可能已经把他挪到过道中间 */
   if (lessonPerson && lessonPerson.group){
     const gp = lessonPerson.group;
-    gp.position.x = NETBAR.x - 5.25;
-    gp.position.z = NETBAR.z - 2.35;
-    gp.rotation.y = -Math.PI / 2;
+    gp.position.x = NETBAR.x - 5.6;
+    gp.position.z = NETBAR.z + 1.9;
+    gp.rotation.y = Math.PI / 2;
     lessonPerson.head.rotation.x = 0;
     lessonPerson.armL.rotation.x = -0.25;
     lessonPerson.armR.rotation.x = -0.25;
@@ -191,7 +192,7 @@ function showLessonBar(){
   const el = $('bossBar');
   const nm = $('bbName');
   const sb = $('bbSub');
-  if (nm) nm.textContent = '那 个 人';
+  if (nm) nm.textContent = '小 明';
   if (sb) sb.textContent = '连第一题都没 AC 的人';
   if (el) el.classList.remove('hidden');
 }
@@ -421,12 +422,12 @@ function lessonWin(){
   hideLessonBar();
   if (lessonState.ring) lessonState.ring.visible = false;
 
-  /* 他坐回椅子上，屏幕还是红的 */
+  /* 他蹲回门口那罐可乐旁边，屏幕还是红的 */
   if (lessonPerson && lessonPerson.group){
     const p = lessonPerson.group;
-    p.position.x = NETBAR.x - 5.25;
-    p.position.z = NETBAR.z - 2.35;
-    p.rotation.y = -Math.PI / 2;
+    p.position.x = NETBAR.x - 5.6;
+    p.position.z = NETBAR.z + 1.9;
+    p.rotation.y = Math.PI / 2;
     /* buildPerson 返回 { group, armL, armR, head } —— 部件在**外层**，
        不在 group 上（group 是 THREE.Group，没有 head/armL）。 */
     lessonPerson.head.rotation.x = -0.35;
@@ -436,19 +437,19 @@ function lessonWin(){
   if (lessonScr) lessonScr.material.color.setHex(0x2a0b0d);
 
   audio.beep(220, 0.4, 0.06, 'sine');
-  toast('他坐回椅子上，屏幕还停在第一题。', 3000);
+  toast('他背过身，低下头。屏幕还停在第一题。', 3000);
   setTimeout(() => {
-    if (state.area === 'netbar' && !state.ended){
+    if (state.area === 'netbar' && !(state.ended && !state.postExamWorld)){
       toast('网管：「……我说了不赶人的。」', 3200);
     }
   }, 1600);
 
   setTimeout(() => {
-    if (state.ended) return;
+    if (state.ended && !state.postExamWorld) return;
     openDialog({
-      title: '那 个 人',
-      text: '他趴在桌上，肩膀还在动。\n' +
-            '屏幕上的评测记录一片红，最上面那行写着「第一题 · 0 分」。\n\n' +
+      title: '小 明',
+      text: '他蹲在门口，肩膀一起一伏。\n' +
+            '远处 3 号的评测记录一片红，最上面那行写着「第一题 · 0 分」。\n\n' +
             '他没有再看你。',
       options: [{ label: '……', cb: d => closeDialog(d) }]
     });
@@ -473,11 +474,12 @@ function lessonLose(){
   renderHp();
 
   audio.beep(160, 0.5, 0.07, 'square');
-  toast('你被推出了网吧。门在你身后合上 —— 那罐可乐还在桌上。', 3600);
+  toast('你被推出了网吧。门在你身后合上 —— 那罐可乐还留在门口。', 3600);
   setTimeout(() => {
-    if (!state.ended) openDialog({
+    if (state.ended && !state.postExamWorld) return;
+    openDialog({
       title: '网 吧 门 口',
-      text: '你站在街上，霓虹灯在头顶响。\n再进门的时候，他已经走了，椅子上只剩那件校服外套。',
+      text: '你站在街上，霓虹灯在头顶响。\n再进门的时候，他已经走了，门口只剩那罐没开的可乐。',
       options: [{ label: '……', cb: d => closeDialog(d) }]
     });
   }, 1200);

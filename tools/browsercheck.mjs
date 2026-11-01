@@ -2546,8 +2546,10 @@ const lessonProbe = JSON.parse(await evaluate(`JSON.stringify((() => {
   switchArea('netbar'); state.area = 'netbar';
   state.netbarMode = 'post';
   lessonBuild();
-  state.pos.set(NETBAR.x - 2.0, PLAYER_EYE, NETBAR.z - 2.4);
+  state.pos.set(NETBAR.x - 2.0, PLAYER_EYE, NETBAR.z + 1.9);
   state.hp = 5; state.hpMax = 5; state.hpVisible = true; renderHp();
+  const freeSpot = !collides(lessonPerson.group.position.x,
+                             lessonPerson.group.position.z, 0.34);
   lessonTalk();
   const d = dialogs[dialogs.length - 1];
   const opts = d ? d.options.length : 0;
@@ -2559,7 +2561,7 @@ const lessonProbe = JSON.parse(await evaluate(`JSON.stringify((() => {
   for (let i = 0; i < 180; i++){ state.worldTime = wt0 + i * 0.016; updateLesson(0.016, i * 0.016); }
   const p1 = { x: lessonPerson.group.position.x, z: lessonPerson.group.position.z };
   return {
-    opts: opts, active: state.lessonActive,
+    opts: opts, active: state.lessonActive, freeSpot: freeSpot,
     moved: +Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(2),
     gap: +Math.hypot(state.pos.x - p1.x, state.pos.z - p1.z).toFixed(2),
     swings: lessonState.swingCount | 0,
@@ -2568,7 +2570,9 @@ const lessonProbe = JSON.parse(await evaluate(`JSON.stringify((() => {
 })())`));
 console.log('  那个人: ' + JSON.stringify(lessonProbe));
 if (lessonProbe.opts !== 2 || !lessonProbe.active)
-  problems.push('网吧那个人没进战斗：' + JSON.stringify(lessonProbe));
+  problems.push('网吧小明没进战斗：' + JSON.stringify(lessonProbe));
+if (!lessonProbe.freeSpot)
+  problems.push('小明站的位置撞着网吧的桌椅（AI 会卡住）');
 if (!(lessonProbe.moved > 0.3))
   problems.push('网吧那个人不会走过来（位移 ' + lessonProbe.moved + '）');
 if ((lessonProbe.swings | 0) < 1)
