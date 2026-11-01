@@ -429,6 +429,13 @@ function animate(){
   if (wantCrosshair === crosshair.classList.contains('hidden')){
     crosshair.classList.toggle('hidden', !wantCrosshair);
   }
+  /* 快捷栏跟着同一条规则：只在"真的变了"的时候重画，别每帧重建 DOM */
+  const wantHotbar = wantCrosshair && typeof hotbarShouldShow === 'function' &&
+                     hotbarShouldShow();
+  const hotbarEl = $('hotbar');
+  if (hotbarEl && wantHotbar === hotbarEl.classList.contains('hidden')){
+    renderHotbar();
+  }
 
   const inWorld = state.view === 'world';
 

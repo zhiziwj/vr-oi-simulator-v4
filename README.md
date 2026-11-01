@@ -90,7 +90,7 @@ docs/DEVELOPMENT.md   详细设计、踩坑记录与完整验证清单
 
 ```bash
 node tools/tdzscan.mjs       # 加载期 TDZ / 重复声明扫描
-node tools/smoke.mjs         # 无头逻辑冒烟测试，157 项断言
+node tools/smoke.mjs         # 无头逻辑冒烟测试，158 项断言
 node tools/browsercheck.mjs  # 真实 headless Chrome + WebGL（需先起服务）
 ```
 

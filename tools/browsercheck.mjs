@@ -1867,6 +1867,8 @@ const mapsProbe = await evaluate(`(() => {
     animate();
     out.hall.crosshair = !document.getElementById('crosshair')
       .classList.contains('hidden');
+    out.hall.hotbar = !document.getElementById('hotbar')
+      .classList.contains('hidden');
     if (hd && hd.options.length) selectDialogOption(0);
     if (peActions.children.length)
       peActions.children[peActions.children.length - 1].click();
@@ -2462,6 +2464,8 @@ if (mapsProbe.hall.floor !== 0.56 || !mapsProbe.hall.podium)
   problems.push('礼堂舞台/讲台碰撞不对：' + JSON.stringify(mapsProbe.hall));
 if (!mapsProbe.hall.crosshair)
   problems.push('考后礼堂没有准星（玩家会盲走）');
+if (!mapsProbe.hall.hotbar)
+  problems.push('考后礼堂没有物品栏（快捷栏）');
 if (String(mapsProbe.hall.dialog).indexOf('表 彰 大 会') < 0 ||
     mapsProbe.hall.opts < 3)
   problems.push('礼堂任务不对：' + JSON.stringify(mapsProbe.hall));
@@ -2516,15 +2520,12 @@ try {
     return {
       touch: !!state.touchMode, body: document.body.classList.contains('touch-mode'),
       canLock: canLockView(), ui: !ui.classList.contains('hidden'),
-      keys: keys, stick: !!stick,
-      dialog: (() => {
-        const d = document.getElementById('touchDialog');
-        return { visible: d && !d.classList.contains('hidden'),
-                 buttons: d ? d.querySelectorAll('button').length : 0 };
-      })()
+      keys: keys, stick: !!stick
     };
   })())`));
-  await sleep(350);
+  /* 触屏弹窗是 mobile.js 里 120ms 轮询出来的：同一个 evaluate 里立刻读
+     会拿到上一帧的旧 DOM（"visible:false" 是假阴性）。等两拍再读。 */
+  await sleep(500);
   const mobDialog = await evaluate(`JSON.stringify((() => {
     const d = document.getElementById('touchDialog');
     const ok = { visible: d && !d.classList.contains('hidden'),

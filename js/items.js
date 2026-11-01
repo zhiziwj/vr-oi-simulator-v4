@@ -358,6 +358,16 @@ function updateItemFx(dt){
 }
 
 /* ---------------------------- 快捷栏 UI ---------------------------- */
+/* 快捷栏什么时候该显示 —— 和准星同一条规则（见 main.js 每帧那段）：
+   "现在能不能在世界里动"。以前写的是 `started && !ended`，于是
+   ① 考后 3D 场景（ended 仍为 true）里物品栏整块消失；
+   ② 校门口斗殴里 renderHotbar 从来没人调用，它就一直挂着 hidden。 */
+function hotbarShouldShow(){
+  if (!state.started) return false;
+  if (state.ended && !state.postExamWorld) return false;
+  return state.view === 'world' && !state.frozen;
+}
+
 function selectHotbar(i){
   if (i < 0 || i >= HOTBAR_SLOTS) return;
   state.hotbarIdx = i;
@@ -367,10 +377,8 @@ function selectHotbar(i){
 function renderHotbar(){
   const el = $('hotbar');
   if (!el) return;
-  /* 没开局、或者已经离场，就不该占着屏幕 */
-  const show = !!state.started && !state.ended;
-  el.classList.toggle('hidden', !show);
-  if (!show) return;
+  el.classList.toggle('hidden', !hotbarShouldShow());
+  if (el.classList.contains('hidden')) return;
 
   el.innerHTML = '';
   for (let i = 0; i < HOTBAR_SLOTS; i++){

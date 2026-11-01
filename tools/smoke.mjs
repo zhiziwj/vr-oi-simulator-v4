@@ -4903,6 +4903,42 @@ check('400 分表彰大会：进专用礼堂地图，而不是校门口', () => 
   `, sandbox);
   return '400 分 → 礼堂（舞台/观众席）→ 说两句 → 结算 400';
 });
+check('快捷栏：校门口斗殴 / 考后 3D 场景都默认显示，结局页收起', () => {
+  const r = JSON.parse(vm.runInContext(`
+    JSON.stringify((() => {
+      const hv = () => !document.getElementById('hotbar').classList.contains('hidden');
+      const out = {};
+      state.started = true;
+      /* ① 校门口斗殴：ended=false、view=world */
+      state.ended = false; state.view = 'world'; state.frozen = false;
+      state.postExamWorld = false;
+      renderHotbar();
+      out.brawl = hv();
+      /* ② 考后 3D 场景：ended 仍是 true，但 postExamWorld 放行 */
+      state.ended = true; state.postExamWorld = true;
+      renderHotbar();
+      out.post = hv();
+      /* ③ 打开背包：不该占屏幕 */
+      state.view = 'bag';
+      renderHotbar();
+      out.bag = hv();
+      /* ④ 真正结束（结算页） */
+      state.view = 'ending'; state.postExamWorld = false;
+      renderHotbar();
+      out.ending = hv();
+      return out;
+    })())
+  `, sandbox));
+  if (!r.brawl) throw new Error('校门口斗殴时快捷栏没显示');
+  if (!r.post) throw new Error('考后 3D 场景里快捷栏没显示');
+  if (r.bag) throw new Error('打开背包时快捷栏还占着屏幕');
+  if (r.ending) throw new Error('结算页不该有快捷栏');
+  vm.runInContext(`
+    state.ended = false; state.postExamWorld = false;
+    state.view = 'world'; renderHotbar();
+  `, sandbox);
+  return '斗殴 ✓ · 考后 ✓ · 背包 ✗ · 结算 ✗';
+});
 check('网吧那个人：嘲讽开打、血量 120、臭水只停 1.2 秒', () => {
   const r = JSON.parse(vm.runInContext(`
     JSON.stringify((() => {
