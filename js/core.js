@@ -106,8 +106,9 @@ const AREA_BOUNDS = {
      校园横向只需覆盖 CAMPUS_HALF_W(13) + 围墙，12.4 的余量刚好够。
      zMax 用到 STREET_MAX_Z：校门外还有一段马路，最外沿是对面人行道。 */
   campus: { x: 12.4, zMin: CP.z - 29.2, zMax: CP.z + STREET_MAX_Z - 0.8 },
-  /* 网吧内部：独立的一块空间，坐标在 -Z 远处，和校园/房间互不重叠 */
-  netbar: { x: 6.2, zMin: NETBAR.z - 4.8, zMax: NETBAR.z + 4.8 },
+  /* 网吧内部：独立的一块空间，坐标在 -Z 远处，和校园/房间互不重叠。
+     尺寸跟着 NETBAR_W / NETBAR_D 走（19 × 15），留 0.4 余量到墙。 */
+  netbar: { x: 9.0, zMin: NETBAR.z - 7.0, zMax: NETBAR.z + 7.0 },
   hall:   { x: 10.5, zMin: HALL.z - 15.0, zMax: HALL.z + 15.0 },
   police: { x: 9.0,  zMin: POLICE.z - 7.0, zMax: POLICE.z + 7.0 },
   coach:  { x: 7.0,  zMin: COACH.z - 6.0, zMax: COACH.z + 6.0 },

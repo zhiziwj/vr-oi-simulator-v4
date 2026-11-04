@@ -16,6 +16,10 @@ let netbarBuilt = false;
 let netbarNeonA = null, netbarNeonB = null, netbarDinoGlow = null;
 const netbarTargets = [];
 
+/* 网吧尺寸：19 × 15（原来 13 × 10 —— 只有六台机位，进门就顶到墙）。
+   下面所有家具坐标都相对 NETBAR 中心，换尺寸只改这两个数。 */
+const NETBAR_W = 19.0, NETBAR_D = 15.0, NETBAR_HW = NETBAR_W / 2, NETBAR_HD = NETBAR_D / 2;
+
 function buildNetbarInterior(){
   if (netbarBuilt) return;
   netbarBuilt = true;
@@ -25,45 +29,44 @@ function buildNetbarInterior(){
   scene.add(G);
 
   /* ---- 地板 / 墙 / 天花板 ---- */
-  box(13.0, 0.10, 10.0, 0x161a22, bx, -0.05, bz, G, { roughness: 0.95 });
-  box(13.0, 0.04, 10.0, 0x232838, bx, 0.005, bz, G, { roughness: 0.7 });
+  box(NETBAR_W, 0.10, NETBAR_D, 0x161a22, bx, -0.05, bz, G, { roughness: 0.95 });
+  box(NETBAR_W, 0.04, NETBAR_D, 0x232838, bx, 0.005, bz, G, { roughness: 0.7 });
   /* 地面网格：网吧那种深色地毯/地砖 */
-  for (let i = -6; i <= 6; i++){
-    box(0.025, 0.005, 10.0, 0x2b3242, bx + i, 0.03, bz, G);
+  for (let i = -9; i <= 9; i++){
+    box(0.025, 0.005, NETBAR_D, 0x2b3242, bx + i, 0.03, bz, G);
   }
-  for (let j = -4; j <= 4; j++){
-    box(13.0, 0.005, 0.025, 0x2b3242, bx, 0.03, bz + j, G);
+  for (let j = -7; j <= 7; j++){
+    box(NETBAR_W, 0.005, 0.025, 0x2b3242, bx, 0.03, bz + j, G);
   }
 
   const wallMat = { roughness: 1 };
-  box(0.16, 4.2, 10.0, 0x0d1017, bx - 6.5, 2.1, bz, G, wallMat);
-  box(0.16, 4.2, 10.0, 0x0d1017, bx + 6.5, 2.1, bz, G, wallMat);
-  box(13.0, 4.2, 0.16, 0x0d1017, bx, 2.1, bz - 5.0, G, wallMat);
-  box(13.0, 4.2, 0.16, 0x0d1017, bx, 2.1, bz + 5.0, G, wallMat);
-  box(13.0, 0.12, 10.0, 0x090b10, bx, 4.2, bz, G, wallMat);
+  box(0.16, 4.2, NETBAR_D, 0x0d1017, bx - NETBAR_HW, 2.1, bz, G, wallMat);
+  box(0.16, 4.2, NETBAR_D, 0x0d1017, bx + NETBAR_HW, 2.1, bz, G, wallMat);
+  box(NETBAR_W, 4.2, 0.16, 0x0d1017, bx, 2.1, bz - NETBAR_HD, G, wallMat);
+  box(NETBAR_W, 4.2, 0.16, 0x0d1017, bx, 2.1, bz + NETBAR_HD, G, wallMat);
+  box(NETBAR_W, 0.12, NETBAR_D, 0x090b10, bx, 4.2, bz, G, wallMat);
 
-  /* ---- 吧台 + 网管 ---- */
-  box(4.2, 1.05, 0.75, 0x2a211a, bx + 3.9, 0.52, bz + 3.1, G, { roughness: 0.8 });
-  box(4.35, 0.08, 0.88, 0x6b4a2c, bx + 3.9, 1.08, bz + 3.1, G, { roughness: 0.6 });
-  box(0.55, 0.52, 0.42, 0x10141c, bx + 4.6, 1.32, bz + 3.34, G); /* 收银机 */
+  /* ---- 吧台 + 网管（挪到右后角，不再堵住进门那条线） ---- */
+  box(5.2, 1.05, 0.75, 0x2a211a, bx + 6.4, 0.52, bz + 5.4, G, { roughness: 0.8 });
+  box(5.35, 0.08, 0.88, 0x6b4a2c, bx + 6.4, 1.08, bz + 5.4, G, { roughness: 0.6 });
+  box(0.55, 0.52, 0.42, 0x10141c, bx + 7.2, 1.32, bz + 5.64, G); /* 收银机 */
   const owner = buildPerson(bx + 4.4, bz + 3.55, 0x3a4a5a, Math.PI, 'stand');
   owner.group.scale.set(0.95, 0.95, 0.95);
   const ownerHit = new THREE.Mesh(
     new THREE.BoxGeometry(0.9, 1.9, 0.9),
     new THREE.MeshBasicMaterial({ visible: false }));
-  ownerHit.position.set(bx + 4.4, 0.95, bz + 3.55);
+  ownerHit.position.set(bx + 6.4, 0.95, bz + 5.85);
   scene.add(ownerHit);
   netbarTargets.push({ obj: ownerHit, kind: 'owner', label: '网管' });
-  netbarColliders.push({ x: bx + 3.9, z: bz + 3.1, hw: 2.2, hd: 0.5 });
+  netbarColliders.push({ x: bx + 6.4, z: bz + 5.4, hw: 2.7, hd: 0.5 });
 
-  /* ---- 机位：六台显示器 + 桌椅 ---- */
+  /* ---- 机位：十二台显示器 + 桌椅（三排 × 四列） ----
+     原来六台挤在 13×10 的小屋里，进门就顶到墙；现在 19×15，
+     中间留出 2 米宽的过道，3 号机仍在最左后角（按编号排的）。 */
   const pods = [
-    { x: -4.4, z: -3.0, dino: true },
-    { x: -4.4, z: -0.8 },
-    { x: -4.4, z: 1.4 },
-    { x: -1.2, z: -3.0 },
-    { x: -1.2, z: -0.8 },
-    { x: -1.2, z: 1.4 }
+    { x: -7.0, z: -5.4, dino: true }, { x: -7.0, z: -2.8 }, { x: -7.0, z: -0.2 }, { x: -7.0, z: 2.4 },
+    { x: -2.6, z: -5.4 }, { x: -2.6, z: -2.8 }, { x: -2.6, z: -0.2 }, { x: -2.6, z: 2.4 },
+    { x: 1.8,  z: -5.4 }, { x: 1.8,  z: -2.8 }, { x: 1.8,  z: -0.2 }, { x: 1.8,  z: 2.4 }
   ];
   pods.forEach((p, i) => {
     const px = bx + p.x, pz = bz + p.z;
@@ -103,42 +106,57 @@ function buildNetbarInterior(){
     { text: '极 速 网 咖', size: 64, color: '#ff5fd2' },
     { text: '24H · 机位充足', size: 22, color: '#ffa8e8' }
   ], '#100711', '#ff4fc8');
-  netbarNeonA = cpBoard(neon1, 4.6, 1.5, bx + 6.38, 2.7, bz - 1.4, -Math.PI / 2);
+  netbarNeonA = cpBoard(neon1, 4.6, 1.5, bx + NETBAR_HW - 0.12, 2.7, bz - 1.4, -Math.PI / 2);
   const neon2 = cpTextBoard(512, 160, [
     { text: '未成年', size: 54, color: '#7fd7ff' },
     { text: '禁 止 入 内', size: 38, color: '#d9f4ff' }
   ], '#061018', '#2f7ea8');
-  netbarNeonB = cpBoard(neon2, 2.6, 0.9, bx - 6.38, 2.4, bz + 0.6, Math.PI / 2);
+  netbarNeonB = cpBoard(neon2, 2.6, 0.9, bx - NETBAR_HW + 0.12, 2.4, bz + 0.6, Math.PI / 2);
 
-  /* ---- 出口 ---- */
-  box(1.4, 2.4, 0.12, 0x2a3242, bx, 1.2, bz + 4.94, G);
-  box(1.2, 2.2, 0.03, 0x080a0f, bx, 1.1, bz + 4.90, G);
+  /* ---- 出口（南墙正中；两侧各留一段墙，进门不会立刻贴脸） ---- */
+  box(1.4, 2.4, 0.12, 0x2a3242, bx, 1.2, bz + NETBAR_HD - 0.06, G);
+  box(1.2, 2.2, 0.03, 0x080a0f, bx, 1.1, bz + NETBAR_HD - 0.10, G);
   const doorHit = new THREE.Mesh(
     new THREE.BoxGeometry(1.6, 2.2, 0.8),
     new THREE.MeshBasicMaterial({ visible: false }));
-  doorHit.position.set(bx, 1.1, bz + 4.7);
+  doorHit.position.set(bx, 1.1, bz + NETBAR_HD - 0.3);
   scene.add(doorHit);
   netbarTargets.push({ obj: doorHit, kind: 'exit', label: '回到街上' });
   const exitSign = cpTextBoard(256, 96, [
     { text: '出 口', size: 42, color: '#9fe8ff' }
   ], '#071018', '#2f7ea8');
-  cpBoard(exitSign, 0.7, 0.3, bx, 2.7, bz + 4.86, 0);
+  cpBoard(exitSign, 0.7, 0.3, bx, 2.7, bz + NETBAR_HD - 0.14, 0);
 
   /* 灯光：网吧不需要太阳，只需要几盏冷光 + 粉色霓虹 */
   const l1 = new THREE.PointLight(0x9fc6ff, 0.9, 14, 2);
   l1.position.set(bx, 3.8, bz + 2.0); scene.add(l1);
   const l2 = new THREE.PointLight(0xff5fd2, 0.5, 10, 2);
-  l2.position.set(bx + 5.6, 2.6, bz - 1.4); scene.add(l2);
+  l2.position.set(bx + NETBAR_HW - 0.9, 2.6, bz - 1.4); scene.add(l2);
   const l3 = new THREE.PointLight(0x7dff9a, 0.55, 7, 2);
-  l3.position.set(bx - 4.4, 2.2, bz - 2.8); scene.add(l3);
+  l3.position.set(bx - 7.0, 2.2, bz - 5.0); scene.add(l3);
+  /* 大房间需要两盏补光，否则后半边是黑的 */
+  const l4 = new THREE.PointLight(0x9fc6ff, 0.55, 18, 2);
+  l4.position.set(bx + 2.0, 3.7, bz - 3.0); scene.add(l4);
+  const l5 = new THREE.PointLight(0xffd0a0, 0.4, 14, 2);
+  l5.position.set(bx + 6.0, 3.4, bz + 4.0); scene.add(l5);
 
   /* 烟味：一层很淡的平面雾（不加后处理，省性能） */
-  const haze = new THREE.Mesh(new THREE.PlaneGeometry(12, 9),
+  const haze = new THREE.Mesh(new THREE.PlaneGeometry(NETBAR_W - 0.6, NETBAR_D - 0.6),
     new THREE.MeshBasicMaterial({ color: 0x2a3550, transparent: true,
       opacity: 0.08, depthWrite: false }));
   haze.rotation.x = -Math.PI / 2;
   haze.position.set(bx, 1.6, bz);
   G.add(haze);
+
+  /* ---- 中间那条"走道的桌子"：几排共享长桌，别让大房间空荡荡 ---- */
+  for (const row of [{ z: -4.1 }, { z: -1.5 }, { z: 1.1 }]){
+    box(5.6, 0.07, 0.8, 0x33302a, bx + 7.6, 0.74, bz + row.z, G, { roughness: 0.85 });
+    box(0.06, 0.7, 0.06, 0x1b1f28, bx + 5.0, 0.37, bz + row.z, G);
+    box(0.06, 0.7, 0.06, 0x1b1f28, bx + 10.2, 0.37, bz + row.z, G);
+    for (let k = 0; k < 3; k++){
+      box(0.5, 0.06, 0.5, 0x242a36, bx + 6.2 + k * 1.8, 0.46, bz + row.z + 1.0, G);
+    }
+  }
 }
 
 /* 出生点安全落位：网吧的桌椅/吧台都有碰撞，进门时如果正落在桌子里，
@@ -146,7 +164,7 @@ function buildNetbarInterior(){
    这里按候选点找第一个不撞的；全撞了就退到门口。 */
 function netbarSpawnAt(x, z, yaw){
   const tries = [[x, z], [x + 1.3, z], [x - 1.3, z], [x, z + 1.2],
-                 [x, z - 1.2], [0, 2.6], [2.6, 1.4], [0, 3.6]];
+                 [x, z - 1.2], [0, 4.2], [4.6, 4.6], [0, 6.0]];
   for (const p of tries){
     if (!collides(p[0], p[1], PLAYER_RADIUS)){
       state.pos.set(p[0], PLAYER_EYE, p[1]);
@@ -155,7 +173,7 @@ function netbarSpawnAt(x, z, yaw){
       return true;
     }
   }
-  state.pos.set(NETBAR.x, PLAYER_EYE, NETBAR.z + 3.6);
+  state.pos.set(NETBAR.x, PLAYER_EYE, NETBAR.z + 6.0);
   state.yaw = yaw; yawTarget = yaw;
   state.pitch = 0; pitchTarget = 0;
   return false;
@@ -171,7 +189,7 @@ function enterNetbarPre(){
   state.ended = false;
   state.view = 'world';
   switchArea('netbar');
-  netbarSpawnAt(NETBAR.x, NETBAR.z + 3.8, 0);
+  netbarSpawnAt(NETBAR.x, NETBAR.z + 6.2, 0);
   state.pauseGraceUntil = performance.now() + 1400;
   requestLock();
   toast('门帘落下。点击画面锁定鼠标，WASD 走到 3 号机，E 打开电脑。', 3200);
@@ -190,7 +208,7 @@ function enterNetbarPost(){
   state.ended = true;
   state.view = 'world';
   switchArea('netbar');
-  netbarSpawnAt(NETBAR.x - 2.6, NETBAR.z + 2.2, 0.33);
+  netbarSpawnAt(NETBAR.x - 1.4, NETBAR.z + 5.4, 0.22);
   /* 最里面那排机位旁边站着一个人（lesson.js）：只在考后出现 */
   if (typeof lessonBuild === 'function'){
     lessonBuild();

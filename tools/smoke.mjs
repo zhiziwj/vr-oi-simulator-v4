@@ -4903,6 +4903,38 @@ check('400 分表彰大会：进专用礼堂地图，而不是校门口', () => 
   `, sandbox);
   return '400 分 → 礼堂（舞台/观众席）→ 说两句 → 结算 400';
 });
+check('街景：车不压线不穿模、同道跟车不追尾、楼退到可走范围外', () => {
+  const r = JSON.parse(vm.runInContext(`
+    JSON.stringify((() => {
+      const out = { cars: streetCars.length };
+      const halfLane = (STREET_FAR_CURB_Z - STREET_CURB_Z) / 2;
+      out.laneMargin = +((halfLane - Math.abs(STREET_NEAR_LANE_Z - STREET_ROAD_MID_Z)) - 0.8).toFixed(2);
+      out.laneGap = +(Math.abs(STREET_FAR_LANE_Z - STREET_NEAR_LANE_Z) - 1.6).toFixed(2);
+      out.reflowOutside = STREET_CAR_HALF > AREA_BOUNDS.campus.x + 2.8;
+      const sig = { walk: false };
+      let minGap = Infinity;
+      for (let i = 0; i < 2500; i++){
+        stUpdateCars(1 / 60, sig);
+        const near = streetCars.filter(c => c.lane === STREET_NEAR_LANE_Z);
+        if (near.length === 2){
+          const d = Math.abs(near[0].x - near[1].x);
+          if (d < minGap) minGap = d;
+        }
+      }
+      out.minGap = +minGap.toFixed(2);
+      out.walkDepth = +(STREET_MAX_Z - STREET_FAR_CURB_Z).toFixed(1);
+      return out;
+    })())
+  `, sandbox));
+  if (r.cars !== 4) throw new Error('车数不对：' + r.cars);
+  if (!(r.laneMargin >= 0)) throw new Error('车道太窄，车会压到路缘：' + r.laneMargin);
+  if (!(r.laneGap >= 0)) throw new Error('两条车道的车会贴在一起：' + r.laneGap);
+  if (!r.reflowOutside) throw new Error('车的绕回点落在可走范围里');
+  if (!(r.minGap >= 1.6)) throw new Error('同道追尾/穿模：最小车距 ' + r.minGap);
+  if (!(r.walkDepth >= 10)) throw new Error('对面人行道还是太窄：' + r.walkDepth);
+  return '车道余量 ' + r.laneMargin + 'm · 同道最小车距 ' + r.minGap +
+         'm · 绕回点在界外 · 人行道深 ' + r.walkDepth + 'm';
+});
 check('快捷栏：校门口斗殴 / 考后 3D 场景都默认显示，结局页收起', () => {
   const r = JSON.parse(vm.runInContext(`
     JSON.stringify((() => {

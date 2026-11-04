@@ -38,10 +38,10 @@ const lessonState = {
 };
 
 /* ---------------------------- 建模 ----------------------------
-   站位：**门口左侧那片空地**（bx-5.6, bz+1.9）。
-   之前放在最里排机位旁边（bx-5.25, bz-2.35）—— 那里紧挨着 1 号机的
-   桌椅碰撞盒（中心 bx-4.4, bz-2.8，半宽 0.65 / 半深 0.45），AI 逐轴滑动
-   往玩家方向走时两个轴都撞，人就"卡在原地不动"。门口这片没有任何碰撞。 */
+   站位：**左墙与机位之间的过道**（bx-8.2, bz+2.4），19×15 的新网吧里
+   这一整条路都没有碰撞。历史上两次踩坑记在这里：
+     ① 最里排机位旁（bx-5.25, bz-2.35）紧挨 1 号机的桌椅碰撞盒，AI 卡死；
+     ② 门口正对出口那一小块，虽然空，但玩家一进门就和他贴脸。 */
 function lessonBuild(){
   if (lessonBuilt) return;
   lessonBuilt = true;
@@ -55,7 +55,7 @@ function lessonBuild(){
   scene.add(G);
   lessonGroup = G;
 
-  const px = bx - 5.6, pz = bz + 1.9;
+  const px = bx - 8.2, pz = bz + 2.4;
   const p = buildPerson(px, pz, 0x30384a, Math.PI / 2, 'stand');
   /* 眼镜和立起来的衣领：让它看起来像个熬夜的人，不是一个杂兵 */
   box(0.20, 0.05, 0.02, 0x101318, 0.0, 1.42, 0.15, p.group);
@@ -70,7 +70,7 @@ function lessonBuild(){
   /* 3 号的那块屏：远处那台机子亮着红，评测记录停在第一题 */
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.36),
     new THREE.MeshBasicMaterial({ color: 0x3a0d10 }));
-  scr.position.set(bx - 4.4, 1.28, bz - 2.95);
+  scr.position.set(bx - 7.0, 1.28, bz - 5.35);
   G.add(scr);
   lessonScr = scr;
 
@@ -166,8 +166,8 @@ function lessonStart(){
   /* 站位复位：上一场可能已经把他挪到过道中间 */
   if (lessonPerson && lessonPerson.group){
     const gp = lessonPerson.group;
-    gp.position.x = NETBAR.x - 5.6;
-    gp.position.z = NETBAR.z + 1.9;
+    gp.position.x = NETBAR.x - 8.2;
+    gp.position.z = NETBAR.z + 2.4;
     gp.rotation.y = Math.PI / 2;
     lessonPerson.head.rotation.x = 0;
     lessonPerson.armL.rotation.x = -0.25;
@@ -425,8 +425,8 @@ function lessonWin(){
   /* 他蹲回门口那罐可乐旁边，屏幕还是红的 */
   if (lessonPerson && lessonPerson.group){
     const p = lessonPerson.group;
-    p.position.x = NETBAR.x - 5.6;
-    p.position.z = NETBAR.z + 1.9;
+    p.position.x = NETBAR.x - 8.2;
+    p.position.z = NETBAR.z + 2.4;
     p.rotation.y = Math.PI / 2;
     /* buildPerson 返回 { group, armL, armR, head } —— 部件在**外层**，
        不在 group 上（group 是 THREE.Group，没有 head/armL）。 */

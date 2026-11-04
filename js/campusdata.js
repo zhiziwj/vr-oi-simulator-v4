@@ -32,16 +32,17 @@ const CAMPUS_HALF_W = CAMPUS_W / 2;
        8 ── 校门
       8..15.4   校门口的人行道 + 沿街小店（文印店 / 早餐摊 / 小卖部）
      15.4..21.6 马路（双向两车道 + 正对校门的斑马线）
-     21.6..28   对面人行道（公交站 · 网吧 · 遮住视野的临街楼）
+     21.6..34   对面人行道（公交站 · 网吧 · 遮住视野的临街楼）
    所以 CAMPUS_MAX_Z 仍然只管"校门以内"，街道的最外沿是 STREET_MAX_Z。
    两个数分开写，是为了不把校园里那些树、围墙、路灯一起推到马路上。 */
-const STREET_MAX_Z      = 28.0;             /* 可走范围最外沿（对面人行道） */
+const STREET_MAX_Z      = 34.0;             /* 可走范围最外沿（对面人行道）；原来 28，人行道只有 6 米深，太窄 */
 const STREET_CURB_Z     = 15.4;             /* 学校这一侧的路缘 */
 const STREET_FAR_CURB_Z = 21.6;             /* 对面路缘 */
 const STREET_ROAD_MID_Z = (STREET_CURB_Z + STREET_FAR_CURB_Z) / 2;
 const STREET_CROSS_HALF_W = 2.4;            /* 斑马线半宽（正对校门） */
-const STREET_NEAR_LANE_Z  = 16.9;           /* 靠近学校那条车道中心 */
-const STREET_FAR_LANE_Z   = 20.1;           /* 对面那条车道中心 */
+const STREET_LANE_HALF  = 1.6;              /* 单条车道半宽（马路 6.2 米 ⇒ 两条 3.1 米车道） */
+const STREET_NEAR_LANE_Z  = STREET_ROAD_MID_Z - STREET_LANE_HALF;   /* 靠学校那条车道中心 17.1 */
+const STREET_FAR_LANE_Z   = STREET_ROAD_MID_Z + STREET_LANE_HALF;   /* 对面那条车道中心 19.9 */
 
 const CAMPUS_PORTAL_X = 5.2;                 /* 传送圈位置（门口旁边） */
 const CAMPUS_PORTAL_Z = 5.0;

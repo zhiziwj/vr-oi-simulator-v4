@@ -25,9 +25,9 @@
 /* ---------------------------- 街上的常数 ---------------------------- */
 const STREET_LIGHT_CYCLE = 20;        /* 红绿灯一轮 20 秒 */
 const STREET_WALK_TIME   = 9;          /* 其中 9 秒是行人绿灯 */
-const STREET_CAR_HALF    = 45;         /* 车开到这么远就绕回另一头 */
-const STREET_NEAR_STOP_X = -4.6;       /* 靠近学校那条车道：停在斑马线前 */
-const STREET_FAR_STOP_X  =  4.6;       /* 对面那条车道 */
+const STREET_CAR_HALF    = 32;           /* 车开到这么远就绕回另一头（> 可走半宽 12.4 + 车长 2.8，看不见瞬移） */
+const STREET_NEAR_STOP_X = -5.2;         /* 靠近学校那条车道：停在斑马线前（斑马线半宽 2.4 + 车头 2.8） */
+const STREET_FAR_STOP_X  =  5.2;         /* 对面那条车道 */
 
 /* 车流。车不是障碍物 —— 撞不到你；能撞到你的只有"红灯时横穿"那一下。 */
 const streetCars = [];
@@ -218,34 +218,57 @@ function stBuildSignals(){
   }
 }
 
+/* ---------------------------- 车流 ----------------------------
+   **不穿模**这件事靠三件一起做（少任何一件都会穿）：
+     ① 几何收窄：车身半宽 0.8 → 车道半宽 1.6，两条车道各留 0.8m 余量，
+        对面来车不会在中心线上"擦身而过"；
+     ② 绕回放在 x = ±STREET_CAR_HALF：那是玩家走不到的地方，
+        所以"瞬移回另一头"看不见 —— 以前在 ±45，边界外但仍在可见街景里；
+     ③ 同道限速：同一车道里距离小于 MIN_GAP 就跟着前车走，
+        堵车/急刹时不会互相插进对方身体里。
+   车轮贴地：车体底面 0.165、轮子半径 0.15 —— 车不会浮在半空也不会陷进路面。 */
+const STREET_CAR_INFLATE = 0.55;     /* 车身与停止线的额外余量（车头长） */
+const STREET_CAR_LANE_GAP = 1.9;     /* 同车道跟车最小车距（车身长 2.8） */
+const STREET_CAR_REFLOW_X = 34;      /* 玩家活动范围外才允许绕过彼此 */
+
 function stBuildCar(color){
   const g = new THREE.Group();
-  box(3.8, 0.55, 1.60, color, 0, 0.44, 0, g, { roughness: 0.35, metalness: 0.35 });
-  box(1.90, 0.48, 1.44, 0x1a2230, -0.15, 0.88, 0, g,
+  /* 车身：长 2.8 宽 1.6 高 0.60，底面 0.165 —— 轮子（半径 0.15）正好落地 */
+  box(2.80, 0.60, 1.60, color, 0, 0.465, 0, g, { roughness: 0.35, metalness: 0.35 });
+  /* 车厢：比车顶再窄一点，做出"车身往里收"的轮廓 */
+  box(1.52, 0.46, 1.42, 0x1a2230, -0.15, 1.00, 0, g,
       { roughness: 0.18, metalness: 0.4, transparent: true, opacity: 0.82 });
-  /* 轮子：四个小方块，便宜、远看足够 */
-  for (const sx of [-1.22, 1.22]){
-    for (const sz of [-0.72, 0.72]){
-      box(0.54, 0.30, 0.14, 0x090b10, sx, 0.22, sz, g);
+  /* 车顶盖：封住玻璃，别让远看是一块空心方块 */
+  box(1.42, 0.06, 1.34, color, -0.15, 1.25, 0, g, { roughness: 0.4, metalness: 0.3 });
+  /* 轮子：四个贴着路面的圆柱，r=0.15 / 厚 0.16，轴向朝 z（横穿车身） */
+  for (const sx of [-0.92, 0.92]){
+    for (const sz of [-0.70, 0.70]){
+      const wheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.15, 0.16, 10),
+        mat(0x090b10, { roughness: 0.9 }));
+      wheel.position.set(sx, 0.15, sz);
+      wheel.rotation.x = Math.PI / 2;
+      g.add(wheel);
     }
   }
-  /* 车灯：车头（局部 +x）暖白，车尾红 */
+  /* 车灯：车头（局部 +x）暖白，车尾红 —— 用 basic 材质，夜里才亮得起来 */
   for (const sz of [-0.52, 0.52]){
-    box(0.10, 0.10, 0.16, 0xfff0c0, 1.92, 0.48, sz, g).material =
-      new THREE.MeshBasicMaterial({ color: 0xfff0c0 });
-    box(0.08, 0.10, 0.16, 0xff2a2a, -1.92, 0.48, sz, g).material =
-      new THREE.MeshBasicMaterial({ color: 0xff2a2a });
+    const head = box(0.06, 0.12, 0.20, 0xfff0c0, 1.40, 0.56, sz, g);
+    head.material = new THREE.MeshBasicMaterial({ color: 0xfff0c0 });
+    const tail = box(0.05, 0.12, 0.20, 0xff2a2a, -1.40, 0.56, sz, g);
+    tail.material = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
   }
-  addContactShadow(g, 1.5);
+  addContactShadow(g, 1.0);
   return g;
 }
 
 function stBuildCars(){
+  /* x 都是"玩家绝对到不了"的初始位置，绕回点在 ±STREET_CAR_HALF */
   const specs = [
-    { lane: STREET_NEAR_LANE_Z, x: -24, dir:  1, color: 0x9a3b3b, speed: 7.2 },
-    { lane: STREET_NEAR_LANE_Z, x: -9,  dir:  1, color: 0x3b5b8a, speed: 6.4 },
-    { lane: STREET_FAR_LANE_Z,  x: 10,  dir: -1, color: 0xb08a3a, speed: 7.8 },
-    { lane: STREET_FAR_LANE_Z,  x: 26,  dir: -1, color: 0x4a6a52, speed: 6.8 }
+    { lane: STREET_NEAR_LANE_Z, x: -30, dir:  1, color: 0x9a3b3b, speed: 7.2 },
+    { lane: STREET_NEAR_LANE_Z, x:  -8, dir:  1, color: 0x3b5b8a, speed: 6.4 },
+    { lane: STREET_FAR_LANE_Z,  x:  12, dir: -1, color: 0xb08a3a, speed: 7.8 },
+    { lane: STREET_FAR_LANE_Z,  x:  34, dir: -1, color: 0x4a6a52, speed: 6.8 }
   ];
   for (const s of specs){
     const g = stBuildCar(s.color);
@@ -268,20 +291,61 @@ function stCarStopAhead(car, sig){
 }
 function stCarShouldStop(car, sig){
   const ahead = stCarStopAhead(car, sig);
-  return ahead > -2.0 && ahead < 3.0;
+  return ahead > -2.0 && ahead < 3.0 + STREET_CAR_INFLATE;
+}
+
+/* 同车道里挡在我前面的最近那辆车（只看还没绕回的那部分） */
+function stCarLeader(car){
+  let best = null, bestAhead = Infinity;
+  for (const o of streetCars){
+    if (o === car || o.lane !== car.lane || o.dir !== car.dir) continue;
+    const ahead = (o.x - car.x) * car.dir;
+    if (ahead > 0 && ahead < bestAhead){ bestAhead = ahead; best = o; }
+  }
+  return best ? { car: best, ahead: bestAhead } : null;
 }
 
 function stUpdateCars(dt, sig){
+  /* 跟车不能只靠"下一帧再压速度" —— 第一步把速度追上之前，前车已经刹停，
+     后车照样能贴到 0.7 米。所以这里做的是**硬约束**：
+       ① 先按目标速度积分（视觉上的加速度手感）；
+       ② 再逐帧夹：后车不允许比"前车车尾 + 最小车距"更靠前。
+     ② 是最后防线，任何 dt、任何急刹、任何堵车都穿不过去。 */
+  const dl = Math.max(0.001, dt);
   for (const c of streetCars){
     /* 差点撞到人那辆车会真的急刹 1.5 秒 —— 不给它一个 brakedUntil，
        "司机急刹"就只是一句字幕，车会从玩家身上直接开过去。 */
     const braked = c.brakedUntil && state.worldTime < c.brakedUntil;
-    const target = braked ? 0 : (stCarShouldStop(c, sig) ? 0 : c.base);
+    let target = braked ? 0 : (stCarShouldStop(c, sig) ? 0 : c.base);
+
+    /* 跟车：同道前方有车就按车距压速度 */
+    const lead = stCarLeader(c);
+    if (lead && lead.ahead < STREET_CAR_LANE_GAP){
+      const gap = Math.max(0, lead.ahead - 2.8);
+      target = Math.min(target, lead.car.speed * (gap < 0.5 ? 0.3 : 0.75));
+      if (gap <= 0.05) target = 0;
+    }
+
     /* 刹车比起步快：绿灯亮起时车流要能立刻停住，红灯亮起时慢慢加速 */
     const rate = target < c.speed ? 4.0 : 2.2;
-    c.speed += (target - c.speed) * Math.min(1, dt * rate);
-    if (c.speed < 0.02) c.speed = 0;
-    c.x += c.dir * c.speed * dt;
+    c.nextSpeed = c.speed + (target - c.speed) * Math.min(1, dl * rate);
+    c.nextX = c.x + c.dir * c.speed * dl;
+  }
+
+  for (const c of streetCars){
+    /* 硬约束：同道前车车尾 + 最小车距，后车不许越过 */
+    const lead = stCarLeader(c);
+    if (lead){
+      const limit = c.x + c.dir * Math.max(0, lead.ahead - STREET_CAR_LANE_GAP);
+      const beyond = (c.nextX - limit) * c.dir > 0;
+      if (beyond){
+        c.nextX = limit;
+        /* 撞到跟车距离就当场停住，别再往前蹭 */
+        if (Math.abs(lead.ahead - STREET_CAR_LANE_GAP) < 0.05) c.nextSpeed = 0;
+      }
+    }
+    c.speed = c.nextSpeed < 0.02 ? 0 : c.nextSpeed;
+    c.x = c.nextX;
     if (c.dir > 0 && c.x > STREET_CAR_HALF) c.x = -STREET_CAR_HALF;
     if (c.dir < 0 && c.x < -STREET_CAR_HALF) c.x = STREET_CAR_HALF;
     c.group.position.x = CP.x + c.x;
@@ -582,21 +646,58 @@ function stFacadeTexture(b){
 }
 
 function stBuildBackdrop(){
+  /* 临街楼：退到 z = 36 之后（原来 30.4~31.4），玩家最多走到 z=33.2，
+     所以门口永远不会贴着一堵墙，而楼仍然挡得住视野。
+     每栋楼不是一块"贴了窗贴纸的方盒子"，而是三件套：
+       楼体（带一点收分） + 顶檐 + 女儿墙，
+     再在脚下补一层店面深色基座，远看才有"楼"的体量，而不是一张纸板。 */
   const buildings = [
-    { x: -14.5, z: 31.2, w: 9.0, h: 12.0, color: 0x1b2430 },
-    { x: -4.5,  z: 30.6, w: 8.0, h: 9.0,  color: 0x232a34 },
-    { x: 5.0,   z: 31.4, w: 9.0, h: 14.0, color: 0x1d2838 },
-    { x: 14.8,  z: 30.4, w: 8.0, h: 10.0, color: 0x242a30 }
+    { x: -17.0, z: 40.0, w: 10.0, h: 15.0, color: 0x1b2430, cw: 0x141c26 },
+    { x: -6.0,  z: 38.5, w: 9.0,  h: 11.0, color: 0x232a34, cw: 0x1a2029 },
+    { x: 4.0,   z: 40.5, w: 9.5,  h: 18.0, color: 0x1d2838, cw: 0x162030 },
+    { x: 14.5,  z: 39.0, w: 9.0,  h: 13.0, color: 0x242a30, cw: 0x1b2025 },
+    { x: 25.0,  z: 41.5, w: 10.0, h: 21.0, color: 0x1a222e, cw: 0x131a23 },
+
+    /* 第二排：更远、更高、更暗 —— 靠颜色和高度"退"到远处去，
+       而不是靠雾。这一排负责把天际线从"四个方盒子"变成"一片城区"。 */
+    { x: -24.0, z: 56.0, w: 12.0, h: 26.0, color: 0x141a22, cw: 0x10151b },
+    { x: -8.0,  z: 58.0, w: 11.0, h: 32.0, color: 0x121820, cw: 0x0e131a },
+    { x: 7.0,   z: 57.0, w: 12.0, h: 24.0, color: 0x151b23, cw: 0x11161c },
+    { x: 22.0,  z: 59.0, w: 11.0, h: 30.0, color: 0x131922, cw: 0x0f141b },
+    { x: 36.0,  z: 55.0, w: 12.0, h: 22.0, color: 0x161c24, cw: 0x12171d }
   ];
   for (const b of buildings){
-    box(b.w, b.h, 6.0, b.color, CP.x + b.x, b.h / 2, CP.z + b.z, scene, { roughness: 0.95 });
+    const bx = CP.x + b.x, bz = CP.z + b.z;
+    const far = b.z > 50;
+
+    /* 楼体：far 那排不带碰撞（玩家走不到），近排也不必加 —— 可走范围到 33.2 */
+    box(b.w, b.h, 7.0, b.color, bx, b.h / 2, bz, scene, { roughness: 0.95 });
+
     /* 正面贴一张画满窗的贴图，代替几十个独立的小平面 */
     const facade = new THREE.Mesh(
       new THREE.PlaneGeometry(b.w - 0.05, b.h - 0.05),
       new THREE.MeshBasicMaterial({ map: canvasTex(stFacadeTexture(b), true) }));
-    facade.position.set(CP.x + b.x, b.h / 2, CP.z + b.z - 3.02);
+    facade.position.set(bx, b.h / 2, bz - 3.52);
     facade.rotation.y = Math.PI;
     scene.add(facade);
+
+    /* 顶檐 + 女儿墙：一块方盒子的顶是"纸板感"最大的来源 */
+    box(b.w + 0.5, 0.5, 7.4, b.cw, bx, b.h + 0.25, bz, scene);
+    box(b.w + 0.5, 0.8, 0.35, b.cw, bx, b.h + 0.9, bz - 3.6, scene);
+    /* 侧墙的窗：从街上斜着看过去也有细节，不至于是一堵纯色墙 */
+    if (!far){
+      const side = new THREE.Mesh(
+        new THREE.PlaneGeometry(6.9, b.h - 0.4),
+        new THREE.MeshBasicMaterial({ map: canvasTex(stFacadeTexture(
+          { w: b.w * 0.7, h: b.h * 0.7, color: b.cw, z: b.z + 7 }), true) }));
+      side.position.set(bx - b.w / 2 - 0.02, b.h / 2, bz);
+      side.rotation.y = -Math.PI / 2;
+      scene.add(side);
+    }
+    /* 一楼店面：深色基座 + 一条亮着的橱窗带 */
+    box(b.w + 0.2, 3.0, 7.2, b.cw, bx, 1.5, bz, scene, { roughness: 0.9 });
+    const shop = box(b.w - 0.8, 1.5, 0.08, 0xffe6b0, bx, 1.9, bz - 3.62, scene);
+    shop.material = new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, opacity: 0.55 });
   }
 
   /* 两块立在楼顶的招牌：街的尽头得有东西告诉玩家"这是商业街" */
@@ -604,13 +705,20 @@ function stBuildBackdrop(){
     { text: '便 利 店', color: '#8fe8ff', size: 90 },
     { text: '24 小 时', color: '#ffd479', size: 34 }
   ], '#0a1420', '#3fb8e0');
-  cpBoard(neon1, 3.6, 0.9, CP.x - 4.5, 9.6, CP.z + 27.57, Math.PI);
+  cpBoard(neon1, 3.6, 0.9, CP.x - 6.0, 10.4, CP.z + 34.95, Math.PI);
 
   const neon2 = cpTextBoard(1024, 256, [
     { text: '第 114 中学', color: '#f2f6ff', size: 78 },
     { text: '考 场 39 · 404 教室', color: '#ffd479', size: 30 }
   ], '#101a2c', '#4a6bff');
-  cpBoard(neon2, 3.8, 0.95, CP.x + 9.0, 8.2, CP.z + 28.34, Math.PI);
+  cpBoard(neon2, 3.8, 0.95, CP.x + 4.0, 8.9, CP.z + 36.96, Math.PI);
+
+  /* 远处的楼群底噪：一排半透明深色板，让天际线不至于断在半空 */
+  for (let i = 0; i < 7; i++){
+    const bx = CP.x - 40 + i * 14, hgt = 30 + (i % 3) * 9;
+    box(12, hgt, 10, 0x0f141b, bx, hgt / 2, CP.z + 74, scene,
+        { roughness: 1, transparent: true, opacity: 0.85 });
+  }
 }
 
 function stBuildLamps(){
