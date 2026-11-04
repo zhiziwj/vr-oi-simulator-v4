@@ -26,6 +26,7 @@
 const STREET_LIGHT_CYCLE = 20;        /* 红绿灯一轮 20 秒 */
 const STREET_WALK_TIME   = 9;          /* 其中 9 秒是行人绿灯 */
 const STREET_CAR_HALF    = 32;           /* 车开到这么远就绕回另一头（> 可走半宽 12.4 + 车长 2.8，看不见瞬移） */
+const STREET_CAR_WRAP_AT = 40;           /* 真正绕回的 x —— 比出生点更远，保证 36 号车不会一出生就被判"越界" */
 const STREET_NEAR_STOP_X = -5.2;         /* 靠近学校那条车道：停在斑马线前（斑马线半宽 2.4 + 车头 2.8） */
 const STREET_FAR_STOP_X  =  5.2;         /* 对面那条车道 */
 
@@ -228,8 +229,10 @@ function stBuildSignals(){
         堵车/急刹时不会互相插进对方身体里。
    车轮贴地：车体底面 0.165、轮子半径 0.15 —— 车不会浮在半空也不会陷进路面。 */
 const STREET_CAR_INFLATE = 0.55;     /* 车身与停止线的额外余量（车头长） */
-const STREET_CAR_LANE_GAP = 1.9;     /* 同车道跟车最小车距（车身长 2.8） */
+const STREET_CAR_LANE_GAP = 3.2;     /* 同车道跟车最小车距（车身长 2.8 —— 必须 > 车长，否则车头已经插进前车车尾） */
 const STREET_CAR_REFLOW_X = 34;      /* 玩家活动范围外才允许绕过彼此 */
+const STREET_CAR_SPAWN_GAP = 3.6;    /* 绕回时和任意一辆车至少隔这么远，绝不叠模 */
+const CAR_BODY_LEN = 2.8, CAR_BODY_WID = 1.6;  /* 车身尺寸（几何与判定共用一份） */
 
 function stBuildCar(color){
   const g = new THREE.Group();
@@ -268,7 +271,10 @@ function stBuildCars(){
     { lane: STREET_NEAR_LANE_Z, x: -30, dir:  1, color: 0x9a3b3b, speed: 7.2 },
     { lane: STREET_NEAR_LANE_Z, x:  -8, dir:  1, color: 0x3b5b8a, speed: 6.4 },
     { lane: STREET_FAR_LANE_Z,  x:  12, dir: -1, color: 0xb08a3a, speed: 7.8 },
-    { lane: STREET_FAR_LANE_Z,  x:  34, dir: -1, color: 0x4a6a52, speed: 6.8 }
+    /* 第二辆对面车：初始位置**离开局可见范围**（玩家 ±12.4 内、车长 2.8），
+       第一秒之内就绕到 40 那一端重新进场 —— 出生点放在 36 会排在 12 号车
+       后面同车道，跟车约束会让它一开局就贴脸。 */
+    { lane: STREET_FAR_LANE_Z,  x:  44, dir: -1, color: 0x4a6a52, speed: 6.8 }
   ];
   for (const s of specs){
     const g = stBuildCar(s.color);
@@ -300,7 +306,11 @@ function stCarLeader(car){
   for (const o of streetCars){
     if (o === car || o.lane !== car.lane || o.dir !== car.dir) continue;
     const ahead = (o.x - car.x) * car.dir;
-    if (ahead > 0 && ahead < bestAhead){ bestAhead = ahead; best = o; }
+    /* 只在"同一条街上"才当它是前车：另一头刚绕回的车（ahead 七十多米）
+       在物理上不是你的前车，把它算进来会让"跟车限速"变成一句空话。 */
+    if (ahead > 0 && ahead < bestAhead && ahead < STREET_CAR_REFLOW_X * 2){
+      bestAhead = ahead; best = o;
+    }
   }
   return best ? { car: best, ahead: bestAhead } : null;
 }
@@ -312,44 +322,78 @@ function stUpdateCars(dt, sig){
        ② 再逐帧夹：后车不允许比"前车车尾 + 最小车距"更靠前。
      ② 是最后防线，任何 dt、任何急刹、任何堵车都穿不过去。 */
   const dl = Math.max(0.001, dt);
+  /* 这一帧开始时先记下同道前车的间距：后车下一次允许走多远，
+     由**它离前车的距离**决定。用"当帧的 ahead" 在上一轮循环里算，
+     会在前车已经前进之后仍然按旧间距放行 —— 后车越贴越近就是这么来的。 */
+  for (const c of streetCars){
+    const lead = stCarLeader(c);
+    c.leadAtStart = lead ? lead.ahead : Infinity;
+    c.leadCar = lead ? lead.car : null;
+  }
   for (const c of streetCars){
     /* 差点撞到人那辆车会真的急刹 1.5 秒 —— 不给它一个 brakedUntil，
        "司机急刹"就只是一句字幕，车会从玩家身上直接开过去。 */
     const braked = c.brakedUntil && state.worldTime < c.brakedUntil;
     let target = braked ? 0 : (stCarShouldStop(c, sig) ? 0 : c.base);
+    if (c.crashed) target = 0;
 
     /* 跟车：同道前方有车就按车距压速度 */
-    const lead = stCarLeader(c);
-    if (lead && lead.ahead < STREET_CAR_LANE_GAP){
-      const gap = Math.max(0, lead.ahead - 2.8);
-      target = Math.min(target, lead.car.speed * (gap < 0.5 ? 0.3 : 0.75));
+    if (c.leadAtStart < STREET_CAR_LANE_GAP){
+      const gap = Math.max(0, c.leadAtStart - CAR_BODY_LEN);
+      /* 目标速度按"离前车还有多远"给：间距越小越慢。
+         注意这里是**沿本项目帧起点**的间距，所以后车这一帧最多只会走到
+         leadAtStart - (车长 + 0.25)，永远不会骑到前车身上。 */
+      target = Math.min(target, gap * 2.0);
       if (gap <= 0.05) target = 0;
     }
 
     /* 刹车比起步快：绿灯亮起时车流要能立刻停住，红灯亮起时慢慢加速 */
     const rate = target < c.speed ? 4.0 : 2.2;
     c.nextSpeed = c.speed + (target - c.speed) * Math.min(1, dl * rate);
-    c.nextX = c.x + c.dir * c.speed * dl;
+    /* 本帧最多走到"让出车长 + 0.25"的地方（前车这一帧最多也只走这么远） */
+    let step = c.speed * dl;
+    if (c.leadCar){
+      const room = Math.max(0, c.leadAtStart - (CAR_BODY_LEN + 0.6));
+      step = Math.min(step, room);
+    }
+    c.nextX = c.x + c.dir * step;
   }
 
   for (const c of streetCars){
-    /* 硬约束：同道前车车尾 + 最小车距，后车不许越过 */
-    const lead = stCarLeader(c);
-    if (lead){
-      const limit = c.x + c.dir * Math.max(0, lead.ahead - STREET_CAR_LANE_GAP);
-      const beyond = (c.nextX - limit) * c.dir > 0;
-      if (beyond){
-        c.nextX = limit;
-        /* 撞到跟车距离就当场停住，别再往前蹭 */
-        if (Math.abs(lead.ahead - STREET_CAR_LANE_GAP) < 0.05) c.nextSpeed = 0;
-      }
-    }
     c.speed = c.nextSpeed < 0.02 ? 0 : c.nextSpeed;
     c.x = c.nextX;
-    if (c.dir > 0 && c.x > STREET_CAR_HALF) c.x = -STREET_CAR_HALF;
-    if (c.dir < 0 && c.x < -STREET_CAR_HALF) c.x = STREET_CAR_HALF;
+  }
+
+  /* 绕回放在这一段的最后，而且**两辆车不能落在同一个位置**：
+     以前一辆车刚绕回 x=-32，另一辆也正好开过 x=-32，两张车模就叠在一起了
+     —— 这正是"车还是会重叠"的真凶（跟车约束只管同车道前后，管不了绕回）。
+     现在绕回时检查整条街：有车贴近就直接跳过这个周期，去下一个空位。 */
+  for (const c of streetCars){
+    const limit = STREET_CAR_WRAP_AT;
+    const wrapped = (c.dir > 0 && c.x > limit) || (c.dir < 0 && c.x < -limit);
+    if (wrapped){
+      const target = c.dir > 0 ? -limit : limit;
+      if (!stCarSlotFree(c, target, STREET_CAR_SPAWN_GAP)){
+        /* 位置被占：这一帧先停在路边之外，下一帧再试 */
+        const keep = c.dir > 0 ? limit : -limit;
+        c.x = keep;
+      } else {
+        c.x = target + c.dir * 0.9;
+      }
+      c.speed = 0;
+      c.crashed = false;
+    }
     c.group.position.x = CP.x + c.x;
   }
+}
+
+/* 绕回位置有没有被别的车占住（任何车道都算，宁可多等一帧也不叠模） */
+function stCarSlotFree(car, x, gap){
+  for (const o of streetCars){
+    if (o === car) continue;
+    if (Math.abs(o.x - x) < gap) return false;
+  }
+  return true;
 }
 
 /* =========================================================================
@@ -588,29 +632,70 @@ function stBuildGatekeeper(){
   campusTalkTargets.push({ obj: hit, npc: p, data: GATEKEEPER, obstacle: ob });
 }
 
+/* ---------------------------- 网吧门面 ----------------------------
+   网吧不是一块孤零零立在街边的小盒子，而是**临街楼的一楼开间**：
+   门面宽度和楼一样（9.5m），高度三层通到楼顶檐口，
+   玻璃卷帘门、灯箱、雨棚、台阶、门口霓虹牌都是这个开间的组成部分。
+   室内（19×15）比这个开间深得多 —— "里面比外面看起来大"正是网吧该有的样子。 */
 function stBuildNetbar(){
-  const x = CP.x + 10.4, z = CP.z + 26.3, front = z - 1.1;
+  const bw = 9.5;                            /* = 3 号楼宽度 */
+  const x = CP.x + 4.0;                      /* = 3 号楼中心 */
+  const front = CP.z + 38.5 - 3.6;           /* 临街面 ≈ 34.9 */
+  const depth = 3.2;
 
-  box(3.2, 3.4, 2.2, 0x241f2e, x, 1.7, z, scene, { roughness: 0.9 });
-  box(3.4, 0.24, 2.4, 0x141018, x, 3.4, z, scene);
-  box(1.0, 2.2, 0.08, 0x2f2a3a, x + 0.4, 1.1, front - 0.02, scene);
-  box(0.55, 0.55, 0.06, 0x9fc8e8, x - 0.8, 1.8, front - 0.02, scene,
-      { roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.5 });
+  /* 一楼开间：深色店招基座 + 玻璃门面 */
+  box(bw, 3.6, depth, 0x1a1420, x, 1.8, CP.z + 38.5 + 1.2, scene, { roughness: 0.92 });
+  box(bw - 1.2, 2.6, 0.10, 0x8fc4e8, x, 1.45, front - 0.04, scene,
+      { roughness: 0.16, metalness: 0.25, transparent: true, opacity: 0.42 });
+  /* 玻璃上的竖框 */
+  for (let i = -3; i <= 3; i++){
+    box(0.08, 2.6, 0.12, 0x2a2432, x + i * 1.15, 1.45, front - 0.05, scene);
+  }
+  /* 卷帘门：半拉着 */
+  box(bw - 1.0, 0.55, 0.14, 0x3a3446, x, 2.95, front - 0.06, scene);
+  /* 雨棚 + 台阶 */
+  box(bw - 0.6, 0.16, 1.5, 0x141018, x, 3.35, front - 0.8, scene);
+  box(bw - 1.4, 0.12, 1.1, 0x2b2634, x, 0.06, front - 0.6, scene);
 
-  const sign = cpTextBoard(1024, 256, [
-    { text: '极 速 网 咖', color: '#ff8ad8', size: 74 },
-    { text: '2 4 H · 未 成 年 禁 止 入 内', color: '#8fe8ff', size: 28 }
+  /* 门（左半边是入口） + 门口那块霓虹灯牌 */
+  box(2.2, 2.3, 0.10, 0x2f2a3a, x - 2.6, 1.15, front - 0.02, scene);
+  box(0.10, 2.3, 0.12, 0x8a7c9c, x - 1.5, 1.15, front - 0.04, scene);
+
+  /* 店招：横贯整栋楼底商的灯箱 */
+  const sign = cpTextBoard(2048, 384, [
+    { text: '极 速 网 咖', color: '#ff8ad8', size: 150 },
+    { text: '2 4 H · 昼 夜 开 放 · 未 成 年 禁 止 入 内', color: '#8fe8ff', size: 44 }
   ], '#120a1a', '#ff5ab8');
-  cpBoard(sign, 3.2, 0.8, x, 3.9, front - 0.04, Math.PI);
+  cpBoard(sign, bw - 0.4, 1.85, x, 4.6, front - 0.06, Math.PI);
 
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 0.7),
+  /* 竖排的侧招（沿街最容易被看见的那块） */
+  const vSign = cpTextBoard(256, 1024, [
+    { text: '网', color: '#ffe8ff', size: 150 },
+    { text: '咖', color: '#ffe8ff', size: 150 },
+    { text: '2', color: '#8fe8ff', size: 96 },
+    { text: '4', color: '#8fe8ff', size: 96 },
+    { text: 'H', color: '#8fe8ff', size: 96 }
+  ], '#160a1e', '#ff5ab8');
+  cpBoard(vSign, 1.1, 4.4, x + bw / 2 + 0.55, 4.2, front - 0.5, Math.PI);
+
+  /* 门口那点颜色：霓虹沿着开间打一圈 */
+  for (const sx of [-1, 1]){
+    const strip = box(0.10, 2.9, 0.10, 0xff5fd2, x + sx * (bw / 2 - 0.5), 1.6, front - 0.08, scene);
+    strip.material = new THREE.MeshBasicMaterial({ color: 0xff5fd2 });
+  }
+  const lamp = new THREE.PointLight(0xff5fd2, 0.7, 9, 2);
+  lamp.position.set(x, 2.6, front - 0.9);
+  scene.add(lamp);
+
+  /* 交互面：门口台阶 */
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.4, 0.9),
     new THREE.MeshBasicMaterial({ visible: false }));
-  hit.position.set(x + 0.4, 1.2, front - 0.15);
+  hit.position.set(x - 2.2, 1.2, front - 0.5);
   scene.add(hit);
   campusSpotTargets.push({
     obj: hit, label: '极速网咖', prompt: '[ E ] 推开网吧的门', fn: openNetbar
   });
-  cpAddObstacle(x, z, 1.6, 1.1);
+  cpAddObstacle(x, CP.z + 38.5 + 1.2, bw / 2, 1.8);
 }
 
 /* =========================================================================

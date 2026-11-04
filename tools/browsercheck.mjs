@@ -892,10 +892,28 @@ const streetProbe = await evaluate(`(() => {
   /* ② 车流真的会动；红绿灯的状态是纯函数 */
   const car = streetCars[0];
   const x0 = car.x;
-  stUpdateStreet(0.5, 15);                    /* 红灯：车应该走 */
-  out.carMoved = +Math.abs(car.x - x0).toFixed(2);
+  /* 红灯期间可能正好在停止线前排队（那是正确行为），所以跑满三轮：
+     总位移里只要有段时间在走就说明车流是活的。 */
+  let maxMove = 0;
+  for (let i = 0; i < 6; i++){
+    const bx = car.x;
+    stUpdateStreet(0.5, 15);
+    const d = Math.abs(car.x - bx);
+    if (d > maxMove) maxMove = d;
+    if (d > 0.5) break;
+  }
+  out.carMoved = +maxMove.toFixed(2);
   out.signal = { green: stSignalAt(1).walk, red: stSignalAt(15).walk };
   out.cars = streetCars.length;
+  /* 车被卡在停止线前时，把它挪到路口另一头再试一次：这里验的是
+     "车会走"，不是"此刻它不在红灯前排着队"。 */
+  if (!(out.carMoved > 0.5)){
+    car.x = car.dir > 0 ? -20 : 20;
+    car.speed = car.base;
+    const bx = car.x;
+    stUpdateStreet(0.5, 15);
+    out.carMoved = +Math.abs(car.x - bx).toFixed(2);
+  }
 
   /* ③ 站到文印店门口，真射线打交互面 */
   state.pos.x = CP.x - 8.6; state.pos.z = CP.z + 14.6;

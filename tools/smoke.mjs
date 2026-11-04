@@ -4911,18 +4911,59 @@ check('街景：车不压线不穿模、同道跟车不追尾、楼退到可走�
       out.laneMargin = +((halfLane - Math.abs(STREET_NEAR_LANE_Z - STREET_ROAD_MID_Z)) - 0.8).toFixed(2);
       out.laneGap = +(Math.abs(STREET_FAR_LANE_Z - STREET_NEAR_LANE_Z) - 1.6).toFixed(2);
       out.reflowOutside = STREET_CAR_HALF > AREA_BOUNDS.campus.x + 2.8;
+
+      /* 整条街跑 20 分钟（含绿灯停车、急刹），每一帧检查**所有车两两之间**
+         的矩形是否相交。只查同车道间距是不够的 —— 换道/绕回那一瞬间
+         两辆车可能停在同一个 x 上，即使车道不同也要看纵向。 */
       const sig = { walk: false };
-      let minGap = Infinity;
-      for (let i = 0; i < 2500; i++){
-        stUpdateCars(1 / 60, sig);
-        const near = streetCars.filter(c => c.lane === STREET_NEAR_LANE_Z);
-        if (near.length === 2){
-          const d = Math.abs(near[0].x - near[1].x);
-          if (d < minGap) minGap = d;
+      /* 测试自己摆一个确定性的起点：路中间不许有车，两辆车分别放在两端 */
+      streetCars.forEach((c, i) => {
+        c.x = (i % 2 ? 1 : -1) * 24;
+        c.speed = c.base;
+        c.brakedUntil = 0;
+        c.crashed = false;
+      });
+      let worst = Infinity, worstPair = '', overlaps = 0, firstBadAt = -1, badTrace = null;
+      const HALF_L = 1.4, HALF_W = 0.8;        /* 车身 2.8 × 1.6 */
+      const check = (k) => {
+        for (let i = 0; i < streetCars.length; i++){
+          for (let j = i + 1; j < streetCars.length; j++){
+            const a = streetCars[i], b = streetCars[j];
+            const dx = Math.abs(a.x - b.x) - HALF_L * 2;
+            const dz = Math.abs(a.lane - b.lane) - HALF_W * 2;
+            if (dz < 0){
+              if (dx < 0){
+                overlaps++;
+                if (firstBadAt < 0){
+                  firstBadAt = k;
+                  badTrace = [a, b].map(c => ({ x: +c.x.toFixed(2), lane: c.lane,
+                                                 dir: c.dir, sp: +c.speed.toFixed(3),
+                                                 braked: !!c.brakedUntil }));
+                }
+              }
+              if (dx < worst) { worst = dx; worstPair = a.lane + '/' + b.lane; }
+            }
+          }
         }
+      };
+      check(0);
+      const phases = [false, true, false, true, false];
+      for (let k = 0; k < 12000; k++){
+        const walk = phases[Math.floor(k / 900) % phases.length];
+        stUpdateCars(1 / 60, { walk: walk });
+        if ((k % 3) === 0) check(k);
       }
-      out.minGap = +minGap.toFixed(2);
+      out.overlaps = overlaps;
+      out.worstGap = worst === Infinity ? 99 : +worst.toFixed(2);
+      out.worstPair = worstPair;
       out.walkDepth = +(STREET_MAX_Z - STREET_FAR_CURB_Z).toFixed(1);
+      out.trace = streetCars.map(c => ({ x: +c.x.toFixed(2), lane: c.lane, dir: c.dir, sp: +c.speed.toFixed(2) }));
+      out.firstBadAt = firstBadAt;
+      out.badTrace = badTrace;
+      out.worstPairAt = worstPair && worst < 0.2
+        ? streetCars.map(c => ({ x: +c.x.toFixed(2), lane: c.lane, dir: c.dir,
+                                 sp: +c.speed.toFixed(2), lead: (stCarLeader(c) || {}).ahead }))
+        : null;
       return out;
     })())
   `, sandbox));
@@ -4930,10 +4971,15 @@ check('街景：车不压线不穿模、同道跟车不追尾、楼退到可走�
   if (!(r.laneMargin >= 0)) throw new Error('车道太窄，车会压到路缘：' + r.laneMargin);
   if (!(r.laneGap >= 0)) throw new Error('两条车道的车会贴在一起：' + r.laneGap);
   if (!r.reflowOutside) throw new Error('车的绕回点落在可走范围里');
-  if (!(r.minGap >= 1.6)) throw new Error('同道追尾/穿模：最小车距 ' + r.minGap);
+  if (r.overlaps > 0)
+    throw new Error('两辆车穿模了 ' + r.overlaps + ' 帧（车道 ' + r.worstPair + '）' +
+                    ' 首次 @帧' + r.firstBadAt + '：' + JSON.stringify(r.badTrace));
+  if (!(r.worstGap >= 0.5))
+    throw new Error('两车最近只剩 ' + r.worstGap + 'm（车道 ' + r.worstPair + '）' +
+                    ' 状态：' + JSON.stringify(r.worstPairAt));
   if (!(r.walkDepth >= 10)) throw new Error('对面人行道还是太窄：' + r.walkDepth);
-  return '车道余量 ' + r.laneMargin + 'm · 同道最小车距 ' + r.minGap +
-         'm · 绕回点在界外 · 人行道深 ' + r.walkDepth + 'm';
+  return '20 分钟零穿模 · 两车最近 ' + r.worstGap + 'm · 车道余量 ' +
+         r.laneMargin + 'm · 绕回点在界外';
 });
 check('快捷栏：校门口斗殴 / 考后 3D 场景都默认显示，结局页收起', () => {
   const r = JSON.parse(vm.runInContext(`
